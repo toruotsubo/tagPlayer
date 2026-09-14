@@ -14,6 +14,7 @@ import {
   Shuffle,
   Repeat,
   Repeat1,
+  Check,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
@@ -30,6 +31,7 @@ import {
 } from "./types/music";
 import { TagSidebar } from "./components/TagSidebar";
 import { AlbumGrid } from "./components/AlbumGrid";
+import { TrackList } from "./components/TrackList";
 import { QueueDrawer } from "./components/QueueDrawer";
 import "./App.css";
 
@@ -57,6 +59,23 @@ function App() {
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
   const [isQueueOpen, setIsQueueOpen] = useState(false);
 
+  // View Mode & Tracks by Tag
+  const [viewMode, setViewMode] = useState<"albums" | "tracks">("albums");
+  const [tagTracks, setTagTracks] = useState<TrackWithAlbum[]>([]);
+  const [loadingTagTracks, setLoadingTagTracks] = useState(false);
+
+  // Toast Notification
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (msg: string) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToastMessage(msg);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage(null);
+    }, 2500);
+  };
+
   const isSeeking = useRef(false);
   const currentTrack = currentIndex >= 0 && currentIndex < queue.length ? queue[currentIndex] : null;
 
@@ -81,6 +100,41 @@ function App() {
       setPlaylists(list);
     } catch (e) {
       console.error("Failed to load playlists", e);
+    }
+  };
+
+  // タグ選択変更時のトラック取得 & ビュー自動切り替え
+  useEffect(() => {
+    if (selectedTags.length > 0) {
+      loadTagTracks(selectedTags, matchAll);
+      setViewMode("tracks");
+    } else {
+      if (viewMode === "tracks") {
+        loadTagTracks([], matchAll);
+      }
+    }
+  }, [selectedTags, matchAll]);
+
+  const loadTagTracks = async (tags: string[], isMatchAll: boolean) => {
+    setLoadingTagTracks(true);
+    try {
+      const result = await invoke<TrackWithAlbum[]>("get_tracks_by_tags", {
+        tags,
+        matchAll: isMatchAll,
+      });
+      setTagTracks(result);
+    } catch (e) {
+      console.error("Failed to load tracks by tags", e);
+      setTagTracks([]);
+    } finally {
+      setLoadingTagTracks(false);
+    }
+  };
+
+  const handleSwitchViewMode = (mode: "albums" | "tracks") => {
+    setViewMode(mode);
+    if (mode === "tracks" && tagTracks.length === 0) {
+      loadTagTracks(selectedTags, matchAll);
     }
   };
 
@@ -185,42 +239,154 @@ function App() {
     }
   };
 
-  // アルバム詳細モーダルからトラック選択時
-  const handleSelectTrackFromAlbum = async (track: Track, album: Album) => {
-    try {
-      const rawTracks = await invoke<Track[]>("get_album_tracks", {
-        albumId: album.id,
-      });
-      const sortedTracks = [...rawTracks].sort((a, b) => {
-        const discA = a.disc_number ?? 1;
-        const discB = b.disc_number ?? 1;
-        if (discA !== discB) return discA - discB;
-        const trackA = a.track_number ?? 9999;
-        const trackB = b.track_number ?? 9999;
-        if (trackA !== trackB) return trackA - trackB;
-        return a.title.localeCompare(b.title);
-      });
-      const albumQueue: TrackWithAlbum[] = sortedTracks.map((t) => ({
-        ...t,
-        album_title: album.title,
-        album_artist: album.artist,
-        cover_url: album.cover_url,
-      }));
+  // 単曲の即座再生（キューに追加して再生）
+  const handlePlaySingleTrack = async (
+    track: Track | TrackWithAlbum,
+    album?: Album
+  ) => {
+    const trackWithAlbum: TrackWithAlbum = {
+      ...track,
+      album_title: "album_title" in track ? track.album_title : album?.title ?? "",
+      album_artist: "album_artist" in track ? track.album_artist : album?.artist ?? "",
+      cover_url: "cover_url" in track ? track.cover_url : album?.cover_url,
+    };
 
-      const targetIndex = albumQueue.findIndex((t) => t.id === track.id);
-      setQueue(albumQueue);
-      setCurrentIndex(targetIndex >= 0 ? targetIndex : 0);
-      setPositionSecs(0);
-      setDurationSecs(track.duration_secs);
-
-      await invoke<PlaybackStatus>("play_track", {
-        filePath: track.file_path,
-      });
-      setIsPlaying(true);
-    } catch (err) {
-      console.error("Failed to play album track", err);
-      setIsPlaying(false);
+    const existingIdx = queue.findIndex((t) => t.id === trackWithAlbum.id);
+    if (existingIdx >= 0) {
+      handlePlayTrackAtIndex(existingIdx);
+    } else {
+      const insertIdx = currentIndex >= 0 ? currentIndex + 1 : queue.length;
+      const newQueue = [...queue];
+      newQueue.splice(insertIdx, 0, trackWithAlbum);
+      setQueue(newQueue);
+      handlePlayTrackAtIndex(insertIdx);
     }
+  };
+
+  // 単曲を再生キューの末尾に追加
+  const handleQueueSingleTrack = (
+    track: Track | TrackWithAlbum,
+    album?: Album
+  ) => {
+    const trackWithAlbum: TrackWithAlbum = {
+      ...track,
+      album_title: "album_title" in track ? track.album_title : album?.title ?? "",
+      album_artist: "album_artist" in track ? track.album_artist : album?.artist ?? "",
+      cover_url: "cover_url" in track ? track.cover_url : album?.cover_url,
+    };
+
+    setQueue((prev) => [...prev, trackWithAlbum]);
+    showToast(`「${track.title}」をキューに追加しました`);
+  };
+
+  // アルバム全曲再生
+  const handlePlayAlbum = async (album: Album, albumTracks: Track[]) => {
+    const sortedTracks = [...albumTracks].sort((a, b) => {
+      const discA = a.disc_number ?? 1;
+      const discB = b.disc_number ?? 1;
+      if (discA !== discB) return discA - discB;
+      const trackA = a.track_number ?? 9999;
+      const trackB = b.track_number ?? 9999;
+      if (trackA !== trackB) return trackA - trackB;
+      return a.title.localeCompare(b.title);
+    });
+
+    const albumQueue: TrackWithAlbum[] = sortedTracks.map((t) => ({
+      ...t,
+      album_title: album.title,
+      album_artist: album.artist,
+      cover_url: album.cover_url,
+    }));
+
+    setQueue(albumQueue);
+    if (albumQueue.length > 0) {
+      setCurrentIndex(0);
+      setPositionSecs(0);
+      setDurationSecs(albumQueue[0].duration_secs);
+      try {
+        await invoke<PlaybackStatus>("play_track", {
+          filePath: albumQueue[0].file_path,
+        });
+        setIsPlaying(true);
+      } catch (err) {
+        console.error("Failed to play album", err);
+        setIsPlaying(false);
+      }
+    }
+  };
+
+  // アルバム全曲をキューの末尾に追加
+  const handleQueueAlbum = (album: Album, albumTracks: Track[]) => {
+    const sortedTracks = [...albumTracks].sort((a, b) => {
+      const discA = a.disc_number ?? 1;
+      const discB = b.disc_number ?? 1;
+      if (discA !== discB) return discA - discB;
+      const trackA = a.track_number ?? 9999;
+      const trackB = b.track_number ?? 9999;
+      if (trackA !== trackB) return trackA - trackB;
+      return a.title.localeCompare(b.title);
+    });
+
+    const items: TrackWithAlbum[] = sortedTracks.map((t) => ({
+      ...t,
+      album_title: album.title,
+      album_artist: album.artist,
+      cover_url: album.cover_url,
+    }));
+
+    setQueue((prev) => [...prev, ...items]);
+    showToast(`「${album.title}」の ${items.length} 曲をキューに追加しました`);
+  };
+
+  // 一致曲すべてをキューにして再生
+  const handlePlayAllTracks = (tracks: TrackWithAlbum[]) => {
+    if (tracks.length === 0) return;
+    setQueue(tracks);
+    handlePlayTrackAtIndex(0);
+  };
+
+  // 一致曲すべてをキューの末尾に追加
+  const handleQueueAllTracks = (tracks: TrackWithAlbum[]) => {
+    if (tracks.length === 0) return;
+    setQueue((prev) => [...prev, ...tracks]);
+    showToast(`${tracks.length} 曲をキューに追加しました`);
+  };
+
+  // トラックへのタグ追加
+  const handleAddTrackTag = async (trackId: number, tagName: string) => {
+    try {
+      const updatedTags = await invoke<string[]>("add_track_tag", {
+        trackId,
+        tagName: tagName.trim(),
+      });
+      setTagTracks((prev) =>
+        prev.map((t) => (t.id === trackId ? { ...t, tags: updatedTags } : t))
+      );
+      loadLibrary();
+    } catch (err) {
+      console.error("Add track tag error", err);
+    }
+  };
+
+  // トラックからのタグ削除
+  const handleRemoveTrackTag = async (trackId: number, tagName: string) => {
+    try {
+      const updatedTags = await invoke<string[]>("remove_track_tag", {
+        trackId,
+        tagName,
+      });
+      setTagTracks((prev) =>
+        prev.map((t) => (t.id === trackId ? { ...t, tags: updatedTags } : t))
+      );
+      loadLibrary();
+    } catch (err) {
+      console.error("Remove track tag error", err);
+    }
+  };
+
+  // アルバム詳細モーダルからトラック選択時（互換用）
+  const handleSelectTrackFromAlbum = async (track: Track, album: Album) => {
+    handlePlaySingleTrack(track, album);
   };
 
   // タグからプレイリストを自動生成して再生
@@ -455,17 +621,102 @@ function App() {
         />
 
         {/* Content Area */}
-        <main className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-zinc-900/20 to-zinc-950">
-          <AlbumGrid
-            albums={filteredAlbums}
-            selectedTags={selectedTags}
-            availableTags={library.tags}
-            onSelectTrack={handleSelectTrackFromAlbum}
-            onTagsChanged={loadLibrary}
-          />
+        <main className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-zinc-900/20 to-zinc-950 flex flex-col gap-4">
+          {/* View Mode Switcher & Filter Info */}
+          <div className="flex items-center justify-between pb-3 border-b border-zinc-800/60">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleSwitchViewMode("albums")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === "albums"
+                    ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
+                }`}
+              >
+                <Disc3 className="h-3.5 w-3.5" />
+                <span>アルバム</span>
+                <span className="text-[10px] text-zinc-500 font-mono">
+                  ({filteredAlbums.length})
+                </span>
+              </button>
 
+              <button
+                onClick={() => handleSwitchViewMode("tracks")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === "tracks"
+                    ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
+                }`}
+              >
+                <Music2 className="h-3.5 w-3.5" />
+                <span>曲</span>
+                <span className="text-[10px] text-zinc-500 font-mono">
+                  ({selectedTags.length > 0 ? tagTracks.length : library.total_tracks})
+                </span>
+              </button>
+            </div>
+
+            {selectedTags.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-zinc-400">
+                <span>選択中:</span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {selectedTags.map((tag) => (
+                    <span
+                      key={tag}
+                      onClick={() => handleToggleTag(tag)}
+                      className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-[10px] cursor-pointer hover:bg-indigo-500/30 transition flex items-center gap-1"
+                      title="クリックで解除"
+                    >
+                      #{tag}
+                      <span className="text-[9px] text-indigo-400">×</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {viewMode === "albums" ? (
+            <AlbumGrid
+              albums={filteredAlbums}
+              selectedTags={selectedTags}
+              availableTags={library.tags}
+              currentPlayingTrackId={currentTrack?.id}
+              isPlaying={isPlaying}
+              onSelectTrack={handleSelectTrackFromAlbum}
+              onPlayTrack={handlePlaySingleTrack}
+              onQueueTrack={handleQueueSingleTrack}
+              onPlayAlbum={handlePlayAlbum}
+              onQueueAlbum={handleQueueAlbum}
+              onTagsChanged={loadLibrary}
+            />
+          ) : (
+            <TrackList
+              tracks={tagTracks}
+              selectedTags={selectedTags}
+              availableTags={library.tags}
+              loading={loadingTagTracks}
+              currentPlayingTrackId={currentTrack?.id}
+              isPlaying={isPlaying}
+              onPlayTrack={handlePlaySingleTrack}
+              onQueueTrack={handleQueueSingleTrack}
+              onPlayAll={handlePlayAllTracks}
+              onQueueAll={handleQueueAllTracks}
+              onToggleTag={handleToggleTag}
+              onAddTrackTag={handleAddTrackTag}
+              onRemoveTrackTag={handleRemoveTrackTag}
+            />
+          )}
         </main>
       </div>
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-indigo-600/95 border border-indigo-400/40 text-white text-xs px-4 py-2 rounded-full shadow-2xl z-50 flex items-center gap-2 backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <Check className="h-3.5 w-3.5 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
       {/* Playback Queue Drawer */}
       <QueueDrawer

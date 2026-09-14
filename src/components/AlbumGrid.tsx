@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Disc3, Music, Calendar, Clock, X, Tag, Plus } from "lucide-react";
+import { Disc3, Music, Calendar, Clock, X, Tag, Plus, Play, ListPlus, Volume2 } from "lucide-react";
 import { Album, TagItem, Track } from "../types/music";
 import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -8,7 +8,13 @@ interface AlbumGridProps {
   albums: Album[];
   selectedTags: string[];
   availableTags: TagItem[];
+  currentPlayingTrackId?: number | null;
+  isPlaying?: boolean;
   onSelectTrack?: (track: Track, album: Album) => void;
+  onPlayTrack?: (track: Track, album: Album) => void;
+  onQueueTrack?: (track: Track, album: Album) => void;
+  onPlayAlbum?: (album: Album, tracks: Track[]) => void;
+  onQueueAlbum?: (album: Album, tracks: Track[]) => void;
   onTagsChanged?: () => void;
 }
 
@@ -16,7 +22,13 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   albums,
   selectedTags,
   availableTags,
+  currentPlayingTrackId,
+  isPlaying = false,
   onSelectTrack,
+  onPlayTrack,
+  onQueueTrack,
+  onPlayAlbum,
+  onQueueAlbum,
   onTagsChanged,
 }) => {
   const [activeAlbum, setActiveAlbum] = useState<Album | null>(null);
@@ -315,12 +327,34 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                 </div>
               </div>
 
-              <button
-                onClick={() => setActiveAlbum(null)}
-                className="text-zinc-400 hover:text-zinc-100 p-1.5 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {tracks.length > 0 && (
+                  <>
+                    <button
+                      onClick={() => onPlayAlbum?.(activeAlbum, tracks)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-medium transition cursor-pointer shadow-sm"
+                      title="アルバム全曲を再生"
+                    >
+                      <Play className="h-3.5 w-3.5 fill-current" />
+                      全曲再生
+                    </button>
+                    <button
+                      onClick={() => onQueueAlbum?.(activeAlbum, tracks)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 text-xs font-medium border border-zinc-700/60 transition cursor-pointer"
+                      title="アルバム全曲を再生キューに追加"
+                    >
+                      <ListPlus className="h-3.5 w-3.5" />
+                      全曲キューへ
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => setActiveAlbum(null)}
+                  className="text-zinc-400 hover:text-zinc-100 p-1.5 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             {/* Tracks List */}
@@ -359,23 +393,40 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                             </div>
                           )}
                           <div
-                            className="group py-2.5 px-3 flex items-center justify-between rounded-lg hover:bg-zinc-800/50 transition cursor-pointer text-xs"
-                            onClick={() => onSelectTrack?.(track, activeAlbum)}
+                            className={`group py-2.5 px-3 flex items-center justify-between rounded-lg hover:bg-zinc-800/50 transition cursor-pointer text-xs ${
+                              currentPlayingTrackId === track.id ? "bg-indigo-950/25 border-l-2 border-indigo-500" : ""
+                            }`}
+                            onClick={() => {
+                              if (onPlayTrack) {
+                                onPlayTrack(track, activeAlbum);
+                              } else {
+                                onSelectTrack?.(track, activeAlbum);
+                              }
+                            }}
                           >
                             <div className="flex items-center gap-3 truncate">
                               <span className="w-5 text-zinc-500 font-mono text-center text-[11px]">
                                 {track.track_number ?? "-"}
                               </span>
-                        <div className="flex flex-col truncate">
-                          <span className="font-medium text-zinc-200 group-hover:text-indigo-300 transition truncate">
-                            {track.title}
-                          </span>
-                          <div className="flex items-center gap-2 text-[10px] text-zinc-500 truncate">
-                            {track.artist && <span>{track.artist}</span>}
-                            {track.composer && <span>(作: {track.composer})</span>}
-                          </div>
-                        </div>
-                      </div>
+                              <div className="flex flex-col truncate">
+                                <div className="flex items-center gap-2 truncate">
+                                  <span className={`font-medium transition truncate ${
+                                    currentPlayingTrackId === track.id
+                                      ? "text-indigo-400"
+                                      : "text-zinc-200 group-hover:text-indigo-300"
+                                  }`}>
+                                    {track.title}
+                                  </span>
+                                  {currentPlayingTrackId === track.id && isPlaying && (
+                                    <Volume2 className="h-3.5 w-3.5 text-indigo-400 shrink-0 animate-pulse" />
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px] text-zinc-500 truncate">
+                                  {track.artist && <span>{track.artist}</span>}
+                                  {track.composer && <span>(作: {track.composer})</span>}
+                                </div>
+                              </div>
+                            </div>
 
                       <div className="flex items-center gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
                         {/* Track tags list */}
@@ -438,10 +489,27 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                           )}
                         </div>
 
-                        <span className="text-[11px] text-zinc-500 font-mono flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatDuration(track.duration_secs)}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* Queue Button */}
+                          {onQueueTrack && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onQueueTrack(track, activeAlbum);
+                              }}
+                              className="flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-800 hover:bg-indigo-600 text-zinc-300 hover:text-white border border-zinc-700/40 hover:border-indigo-500 text-[10px] transition cursor-pointer"
+                              title="この曲を再生キューに追加"
+                            >
+                              <Plus className="h-3 w-3" />
+                              <span>キューへ</span>
+                            </button>
+                          )}
+
+                          <span className="text-[11px] text-zinc-500 font-mono flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatDuration(track.duration_secs)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </React.Fragment>

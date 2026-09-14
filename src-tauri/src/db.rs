@@ -293,6 +293,7 @@ pub fn get_tracks_by_tags(
         for r in rows {
             tracks.push(r?);
         }
+        attach_tags_to_tracks(conn, &mut tracks)?;
         return Ok(tracks);
     }
 
@@ -380,7 +381,27 @@ pub fn get_tracks_by_tags(
     for r in rows {
         tracks.push(r?);
     }
+    attach_tags_to_tracks(conn, &mut tracks)?;
     Ok(tracks)
+}
+
+fn attach_tags_to_tracks(conn: &Connection, tracks: &mut [TrackWithAlbum]) -> Result<()> {
+    for track in tracks.iter_mut() {
+        let mut tag_stmt = conn.prepare(
+            "
+            SELECT tg.name
+            FROM tags tg
+            JOIN track_tags tt ON tg.id = tt.tag_id
+            WHERE tt.track_id = ?1
+            ORDER BY tg.name COLLATE NOCASE ASC
+            "
+        )?;
+        track.tags = tag_stmt
+            .query_map(params![track.id], |r| r.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+    }
+    Ok(())
 }
 
 pub fn save_playlist(conn: &mut Connection, name: &str, track_ids: &[i64]) -> Result<i64> {
@@ -464,6 +485,7 @@ pub fn get_playlist_tracks(conn: &Connection, playlist_id: i64) -> Result<Vec<Tr
     for r in rows {
         tracks.push(r?);
     }
+    attach_tags_to_tracks(conn, &mut tracks)?;
     Ok(tracks)
 }
 
