@@ -205,6 +205,16 @@ async fn remove_track_tag(
     db::remove_track_tag(&conn, track_id, &tag_name).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn delete_album(
+    app_handle: tauri::AppHandle,
+    album_id: i64,
+) -> Result<(), String> {
+    let db_path = get_db_path(&app_handle)?;
+    let mut conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+    db::delete_album(&mut conn, album_id).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let player_manager = PlayerManager::new().expect("Failed to initialize player manager");
@@ -233,6 +243,7 @@ pub fn run() {
             remove_album_tag,
             add_track_tag,
             remove_track_tag,
+            delete_album,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Disc3, Music, Calendar, Clock, X, Tag, Plus, Play, ListPlus, Volume2 } from "lucide-react";
+import { Disc3, Music, Calendar, Clock, X, Tag, Plus, Play, ListPlus, Volume2, Trash2 } from "lucide-react";
 import { Album, TagItem, Track } from "../types/music";
 import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -15,6 +15,7 @@ interface AlbumGridProps {
   onQueueTrack?: (track: Track, album: Album) => void;
   onPlayAlbum?: (album: Album, tracks: Track[]) => void;
   onQueueAlbum?: (album: Album, tracks: Track[]) => void;
+  onDeleteAlbum?: (albumId: number) => Promise<void>;
   onTagsChanged?: () => void;
 }
 
@@ -29,11 +30,13 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   onQueueTrack,
   onPlayAlbum,
   onQueueAlbum,
+  onDeleteAlbum,
   onTagsChanged,
 }) => {
   const [activeAlbum, setActiveAlbum] = useState<Album | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loadingTracks, setLoadingTracks] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Album Tag Edit state
   const [isAddingAlbumTag, setIsAddingAlbumTag] = useState(false);
@@ -117,6 +120,30 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
       onTagsChanged?.();
     } catch (err) {
       console.error("Remove track tag error", err);
+    }
+  };
+
+  const handleDeleteAlbum = async () => {
+    if (!activeAlbum || isDeleting) return;
+    const confirmed = window.confirm(
+      `アルバム「${activeAlbum.title}」をライブラリから削除しますか？\n\n※アプリのデータベースから登録情報を削除します。\nパソコン内の音楽ファイル自体は削除されません。`
+    );
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      if (onDeleteAlbum) {
+        await onDeleteAlbum(activeAlbum.id);
+      } else {
+        await invoke("delete_album", { albumId: activeAlbum.id });
+        onTagsChanged?.();
+      }
+      setActiveAlbum(null);
+    } catch (err) {
+      console.error("Delete album error", err);
+      alert(`アルバム削除エラー: ${err}`);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -348,6 +375,18 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                     </button>
                   </>
                 )}
+
+                {/* Album Delete Button */}
+                <button
+                  onClick={handleDeleteAlbum}
+                  disabled={isDeleting}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-red-950/50 text-zinc-400 hover:text-red-400 border border-zinc-700/60 hover:border-red-500/40 text-xs font-medium transition cursor-pointer disabled:opacity-50"
+                  title="アルバムをライブラリから削除（音楽ファイル自体は削除されません）"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>削除</span>
+                </button>
+
                 <button
                   onClick={() => setActiveAlbum(null)}
                   className="text-zinc-400 hover:text-zinc-100 p-1.5 rounded-lg hover:bg-zinc-800 transition cursor-pointer"

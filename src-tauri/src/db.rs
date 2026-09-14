@@ -597,4 +597,39 @@ pub fn cleanup_unused_tags(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+pub fn delete_album(conn: &mut Connection, album_id: i64) -> Result<()> {
+    let tx = conn.transaction()?;
+
+    tx.execute(
+        "DELETE FROM track_tags WHERE track_id IN (SELECT id FROM tracks WHERE album_id = ?1)",
+        params![album_id],
+    )?;
+
+    tx.execute(
+        "DELETE FROM playlist_tracks WHERE track_id IN (SELECT id FROM tracks WHERE album_id = ?1)",
+        params![album_id],
+    )?;
+
+    tx.execute(
+        "DELETE FROM tracks WHERE album_id = ?1",
+        params![album_id],
+    )?;
+
+    tx.execute(
+        "DELETE FROM album_tags WHERE album_id = ?1",
+        params![album_id],
+    )?;
+
+    tx.execute(
+        "DELETE FROM albums WHERE id = ?1",
+        params![album_id],
+    )?;
+
+    tx.commit()?;
+
+    let _ = cleanup_unused_tags(conn);
+
+    Ok(())
+}
+
 

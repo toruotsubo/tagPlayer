@@ -389,6 +389,18 @@ function App() {
     handlePlaySingleTrack(track, album);
   };
 
+  // アルバムのライブラリからの削除
+  const handleDeleteAlbum = async (albumId: number) => {
+    const targetAlbum = library.albums.find((a) => a.id === albumId);
+    const albumTitle = targetAlbum?.title ?? "アルバム";
+    await invoke("delete_album", { albumId });
+    await loadLibrary();
+    if (selectedTags.length > 0 || viewMode === "tracks") {
+      loadTagTracks(selectedTags, matchAll);
+    }
+    showToast(`「${albumTitle}」をライブラリから削除しました`);
+  };
+
   // タグからプレイリストを自動生成して再生
   const handlePlaySelectedTags = async () => {
     if (selectedTags.length === 0) return;
@@ -688,6 +700,7 @@ function App() {
               onQueueTrack={handleQueueSingleTrack}
               onPlayAlbum={handlePlayAlbum}
               onQueueAlbum={handleQueueAlbum}
+              onDeleteAlbum={handleDeleteAlbum}
               onTagsChanged={loadLibrary}
             />
           ) : (
