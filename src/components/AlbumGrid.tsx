@@ -134,10 +134,10 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
     );
   }
 
-  // アルバムタグ用サジェスト（現在のアルバムが持っていない既存タグ）
+  // アルバムタグ用サジェスト（現在のアルバムが持っていない既存タグ、4桁数字タグは除外）
   const albumTagSuggestions = activeAlbum
     ? availableTags
-        .filter((t) => !activeAlbum.tags.includes(t.name))
+        .filter((t) => !activeAlbum.tags.includes(t.name) && !/^\d{4}$/.test(t.name))
         .slice(0, 8)
     : [];
 

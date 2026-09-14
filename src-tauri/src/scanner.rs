@@ -381,6 +381,70 @@ fn read_track_metadata_lofty(path: &Path) -> Option<RawTrackMeta> {
     })
 }
 
+/// WMA (ASF形式) のヘッダーから Content Description Object を解析し、Author (曲のアーティスト) を取得する
+pub fn read_asf_author(path: &Path) -> Option<String> {
+    use std::fs::File;
+    use std::io::Read;
+
+    let mut file = File::open(path).ok()?;
+    let mut header_buf = [0u8; 24];
+    file.read_exact(&mut header_buf).ok()?;
+
+    // ASF Header Object GUID: 30 26 B2 75 8E 66 CF 11 A6 D9 00 AA 00 62 CE 6C
+    const ASF_HEADER_GUID: [u8; 16] = [
+        0x30, 0x26, 0xb2, 0x75, 0x8e, 0x66, 0xcf, 0x11, 0xa6, 0xd9, 0x00, 0xaa, 0x00, 0x62, 0xce, 0x6c,
+    ];
+    if header_buf[..16] != ASF_HEADER_GUID {
+        return None;
+    }
+
+    let header_size = u64::from_le_bytes(header_buf[16..24].try_into().ok()?);
+    let read_size = (header_size as usize).min(1024 * 1024).max(24);
+
+    let mut buf = vec![0u8; read_size];
+    buf[..24].copy_from_slice(&header_buf);
+    let _ = file.read_exact(&mut buf[24..read_size]);
+
+    // ASF Content Description Object GUID: 33 26 B2 75 8E 66 CF 11 A6 D9 00 AA 00 62 CE 6C
+    const CONTENT_DESC_GUID: [u8; 16] = [
+        0x33, 0x26, 0xb2, 0x75, 0x8e, 0x66, 0xcf, 0x11, 0xa6, 0xd9, 0x00, 0xaa, 0x00, 0x62, 0xce, 0x6c,
+    ];
+
+    let guid_pos = buf.windows(16).position(|window| window == CONTENT_DESC_GUID)?;
+
+    let lengths_offset = guid_pos + 16 + 8;
+    if lengths_offset + 10 > buf.len() {
+        return None;
+    }
+
+    let title_len = u16::from_le_bytes(buf[lengths_offset..lengths_offset + 2].try_into().ok()?) as usize;
+    let author_len = u16::from_le_bytes(buf[lengths_offset + 2..lengths_offset + 4].try_into().ok()?) as usize;
+
+    if author_len == 0 {
+        return None;
+    }
+
+    let data_offset = lengths_offset + 10;
+    let author_offset = data_offset + title_len;
+    if author_offset + author_len > buf.len() {
+        return None;
+    }
+
+    let author_bytes = &buf[author_offset..author_offset + author_len];
+    let u16_chars: Vec<u16> = author_bytes
+        .chunks_exact(2)
+        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+        .collect();
+
+    let author_str = String::from_utf16_lossy(&u16_chars);
+    let trimmed = author_str.trim_matches(|c: char| c == '\0' || c.is_whitespace());
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
 #[cfg(windows)]
 fn read_track_metadata_windows(path: &Path) -> Option<RawTrackMeta> {
     use windows::core::HSTRING;
@@ -441,11 +505,16 @@ fn read_track_metadata_windows(path: &Path) -> Option<RawTrackMeta> {
         .or(fallback_album)
         .unwrap_or_else(|| "Unknown Album".to_string());
 
-    let track_artist = music_props
-        .Artist()
-        .ok()
-        .map(|h| h.to_string_lossy().trim().to_string())
-        .filter(|s| !s.is_empty());
+    // WMA 等で Windows MusicProperties.Artist() がコンピレーションの AlbumArtist と同じになるケースがあるため、
+    // まず WMA の Author ヘッダー属性を優先し、無ければ MusicProperties.Artist() を使用する
+    let asf_author = read_asf_author(path);
+    let track_artist = asf_author.or_else(|| {
+        music_props
+            .Artist()
+            .ok()
+            .map(|h| h.to_string_lossy().trim().to_string())
+            .filter(|s| !s.is_empty())
+    });
 
     let album_artist = music_props
         .AlbumArtist()
@@ -980,6 +1049,35 @@ mod tests {
             assert_eq!(result.total_tracks, 19);
             assert!(!result.tags.is_empty());
             assert!(result.albums[0].cover_url.is_some());
+        }
+    }
+
+    #[test]
+    fn test_read_debussy_wma() {
+        let p = std::path::Path::new(r"D:\Music\Various Artists\Debussy- Les Trois Sonates, The Late Works\01 Debussy- Violin Sonata In G Minor, L 140 - 1. Allegro Vivo.wma");
+        if p.exists() {
+            let meta = read_track_metadata(p).expect("Should read metadata");
+            println!("DEBUG META: title={}", meta.title);
+            println!("DEBUG META: album_title={}", meta.album_title);
+            println!("DEBUG META: album_artist={}", meta.album_artist);
+            println!("DEBUG META: track_artist={:?}", meta.track_artist);
+            println!("DEBUG META: composer={:?}", meta.composer);
+
+            assert_eq!(meta.album_artist, "Various Artists");
+            assert_eq!(meta.track_artist, Some("Isabelle Faust, Alexander Melnikov".to_string()));
+
+            let (album_tags, track_tags) = compute_default_tags(
+                &meta.album_artist,
+                meta.track_artist.as_deref(),
+                meta.composer.as_deref(),
+                meta.genre.as_deref(),
+                meta.release_year,
+            );
+            println!("DEBUG album_tags={:?}", album_tags);
+            println!("DEBUG track_tags={:?}", track_tags);
+
+            assert!(track_tags.contains(&"Isabelle Faust, Alexander Melnikov".to_string()));
+            assert!(track_tags.contains(&"Claude Debussy".to_string()));
         }
     }
 }

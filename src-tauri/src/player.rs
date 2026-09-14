@@ -87,7 +87,9 @@ mod win_player {
 
             if let Ok(session) = self.player.PlaybackSession() {
                 if let Ok(state) = session.PlaybackState() {
-                    is_playing = state == MediaPlaybackState::Playing;
+                    is_playing = state == MediaPlaybackState::Playing
+                        || state == MediaPlaybackState::Opening
+                        || state == MediaPlaybackState::Buffering;
                 }
                 if let Ok(pos) = session.Position() {
                     position_secs = (pos.Duration as f64) / 10_000_000.0;

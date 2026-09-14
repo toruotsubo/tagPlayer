@@ -174,12 +174,13 @@ function App() {
     setDurationSecs(track.duration_secs);
 
     try {
-      const status = await invoke<PlaybackStatus>("play_track", {
+      await invoke<PlaybackStatus>("play_track", {
         filePath: track.file_path,
       });
-      setIsPlaying(status.is_playing);
+      setIsPlaying(true);
     } catch (err) {
       console.error("Play track error", err);
+      setIsPlaying(false);
       alert(`再生開始エラー: ${err}`);
     }
   };
@@ -212,12 +213,13 @@ function App() {
       setPositionSecs(0);
       setDurationSecs(track.duration_secs);
 
-      const status = await invoke<PlaybackStatus>("play_track", {
+      await invoke<PlaybackStatus>("play_track", {
         filePath: track.file_path,
       });
-      setIsPlaying(status.is_playing);
+      setIsPlaying(true);
     } catch (err) {
       console.error("Failed to play album track", err);
+      setIsPlaying(false);
     }
   };
 
@@ -240,12 +242,13 @@ function App() {
       setPositionSecs(0);
       setDurationSecs(tracks[0].duration_secs);
 
-      const status = await invoke<PlaybackStatus>("play_track", {
+      await invoke<PlaybackStatus>("play_track", {
         filePath: tracks[0].file_path,
       });
-      setIsPlaying(status.is_playing);
+      setIsPlaying(true);
     } catch (err) {
       console.error("Failed to generate tag playlist", err);
+      setIsPlaying(false);
       alert(`プレイリスト生成エラー: ${err}`);
     }
   };
@@ -267,12 +270,13 @@ function App() {
       setPositionSecs(0);
       setDurationSecs(tracks[0].duration_secs);
 
-      const status = await invoke<PlaybackStatus>("play_track", {
+      await invoke<PlaybackStatus>("play_track", {
         filePath: tracks[0].file_path,
       });
-      setIsPlaying(status.is_playing);
+      setIsPlaying(true);
     } catch (err) {
       console.error("Failed to play saved playlist", err);
+      setIsPlaying(false);
     }
   };
 
