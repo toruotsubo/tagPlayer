@@ -260,121 +260,134 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8 animate-in fade-in duration-150">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
             {/* Modal Header */}
-            <div className="p-6 border-b border-zinc-800/80 flex items-start justify-between gap-4 bg-zinc-900/90">
-              <div className="flex gap-4">
-                <div className="h-24 w-24 rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800 shrink-0 flex items-center justify-center">
-                  {activeAlbum.cover_url ? (
-                    <img
-                      src={convertFileSrc(activeAlbum.cover_url)}
-                      alt={activeAlbum.title}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <Disc3 className="h-10 w-10 text-zinc-600" />
-                  )}
-                </div>
-                <div className="flex flex-col justify-center">
-                  <span className="text-xs uppercase tracking-wider text-indigo-400 font-semibold">
-                    Album
-                  </span>
-                  <h2 className="text-lg font-bold text-zinc-100">{activeAlbum.title}</h2>
-                  <p className="text-xs text-zinc-400 mt-0.5">{activeAlbum.artist}</p>
-
-                  {/* Album Tags with Edit & Delete */}
-                  <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-                    {activeAlbum.tags.map((t, i) => (
-                      <span
-                        key={i}
-                        className="group/tag inline-flex items-center gap-1 text-[10px] pl-2 pr-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30"
-                      >
-                        #{t}
-                        <button
-                          onClick={() => handleRemoveAlbumTag(t)}
-                          className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer"
-                          title="タグを削除"
-                        >
-                          <X className="h-2.5 w-2.5" />
-                        </button>
-                      </span>
-                    ))}
-
-                    {/* Add Album Tag Button / Input */}
-                    {isAddingAlbumTag ? (
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="text"
-                          value={newAlbumTag}
-                          onChange={(e) => setNewAlbumTag(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") handleAddAlbumTag(newAlbumTag);
-                            if (e.key === "Escape") setIsAddingAlbumTag(false);
-                          }}
-                          placeholder="タグ名..."
-                          autoFocus
-                          className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-950 border border-indigo-500/60 text-zinc-100 w-24 focus:outline-none"
-                        />
-                        <button
-                          onClick={() => handleAddAlbumTag(newAlbumTag)}
-                          className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 cursor-pointer"
-                        >
-                          追加
-                        </button>
-                        <button
-                          onClick={() => setIsAddingAlbumTag(false)}
-                          className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
+            <div className="p-6 border-b border-zinc-800/80 flex flex-col gap-4 bg-zinc-900/90">
+              {/* Top Row: Album Info & Close Button */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex gap-4 min-w-0 flex-1">
+                  <div className="h-24 w-24 rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800 shrink-0 flex items-center justify-center shadow-inner">
+                    {activeAlbum.cover_url ? (
+                      <img
+                        src={convertFileSrc(activeAlbum.cover_url)}
+                        alt={activeAlbum.title}
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
-                      <button
-                        onClick={() => setIsAddingAlbumTag(true)}
-                        className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-400 hover:text-zinc-200 border border-zinc-700/40 transition cursor-pointer"
-                      >
-                        <Plus className="h-2.5 w-2.5" /> タグ追加
-                      </button>
+                      <Disc3 className="h-10 w-10 text-zinc-600" />
                     )}
                   </div>
+                  <div className="flex flex-col justify-center min-w-0 flex-1">
+                    <span className="text-xs uppercase tracking-wider text-indigo-400 font-semibold">
+                      Album
+                    </span>
+                    <h2 className="text-lg font-bold text-zinc-100 truncate">{activeAlbum.title}</h2>
+                    <p className="text-xs text-zinc-400 mt-0.5 truncate">{activeAlbum.artist}</p>
 
-                  {/* Tag Suggestions for Album */}
-                  {isAddingAlbumTag && albumTagSuggestions.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1 mt-2 text-[9px] text-zinc-500">
-                      <span>候補:</span>
-                      {albumTagSuggestions.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => handleAddAlbumTag(s.name)}
-                          className="px-1.5 py-0.2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition cursor-pointer"
+                    {/* Album Tags with Edit & Delete */}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                      {activeAlbum.tags.map((t, i) => (
+                        <span
+                          key={i}
+                          className="group/tag inline-flex items-center gap-1 text-[10px] pl-2 pr-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30"
                         >
-                          +{s.name}
-                        </button>
+                          #{t}
+                          <button
+                            onClick={() => handleRemoveAlbumTag(t)}
+                            className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer"
+                            title="タグを削除"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </span>
                       ))}
+
+                      {/* Add Album Tag Button / Input */}
+                      {isAddingAlbumTag ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={newAlbumTag}
+                            onChange={(e) => setNewAlbumTag(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleAddAlbumTag(newAlbumTag);
+                              if (e.key === "Escape") setIsAddingAlbumTag(false);
+                            }}
+                            placeholder="タグ名..."
+                            autoFocus
+                            className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-950 border border-indigo-500/60 text-zinc-100 w-24 focus:outline-none"
+                          />
+                          <button
+                            onClick={() => handleAddAlbumTag(newAlbumTag)}
+                            className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 cursor-pointer"
+                          >
+                            追加
+                          </button>
+                          <button
+                            onClick={() => setIsAddingAlbumTag(false)}
+                            className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setIsAddingAlbumTag(true)}
+                          className="inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-400 hover:text-zinc-200 border border-zinc-700/40 transition cursor-pointer"
+                        >
+                          <Plus className="h-2.5 w-2.5" /> タグ追加
+                        </button>
+                      )}
                     </div>
-                  )}
+
+                    {/* Tag Suggestions for Album */}
+                    {isAddingAlbumTag && albumTagSuggestions.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1 mt-2 text-[9px] text-zinc-500">
+                        <span>候補:</span>
+                        {albumTagSuggestions.map((s) => (
+                          <button
+                            key={s.id}
+                            onClick={() => handleAddAlbumTag(s.name)}
+                            className="px-1.5 py-0.2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition cursor-pointer"
+                          >
+                            +{s.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                <button
+                  onClick={() => setActiveAlbum(null)}
+                  className="text-zinc-400 hover:text-zinc-100 p-1.5 rounded-lg hover:bg-zinc-800 transition cursor-pointer shrink-0"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
 
-              <div className="flex items-center gap-2">
-                {tracks.length > 0 && (
-                  <>
-                    <button
-                      onClick={() => onPlayAlbum?.(activeAlbum, tracks)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-medium transition cursor-pointer shadow-sm"
-                      title="アルバム全曲を再生"
-                    >
-                      <Play className="h-3.5 w-3.5 fill-current" />
-                      全曲再生
-                    </button>
-                    <button
-                      onClick={() => onQueueAlbum?.(activeAlbum, tracks)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 text-xs font-medium border border-zinc-700/60 transition cursor-pointer"
-                      title="アルバム全曲を再生キューに追加"
-                    >
-                      <ListPlus className="h-3.5 w-3.5" />
-                      全曲キューへ
-                    </button>
-                  </>
-                )}
+              {/* Action Buttons Row: Under Album Cover & Tags */}
+              <div className="flex items-center justify-between pt-3 border-t border-zinc-800/60">
+                <div className="flex items-center gap-2">
+                  {tracks.length > 0 && (
+                    <>
+                      <button
+                        onClick={() => onPlayAlbum?.(activeAlbum, tracks)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-medium transition cursor-pointer shadow-sm"
+                        title="アルバム全曲を再生"
+                      >
+                        <Play className="h-3.5 w-3.5 fill-current" />
+                        全曲再生
+                      </button>
+                      <button
+                        onClick={() => onQueueAlbum?.(activeAlbum, tracks)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 text-xs font-medium border border-zinc-700/60 transition cursor-pointer"
+                        title="アルバム全曲を再生キューに追加"
+                      >
+                        <ListPlus className="h-3.5 w-3.5" />
+                        全曲キューへ
+                      </button>
+                    </>
+                  )}
+                </div>
 
                 {/* Album Delete Button */}
                 <button
@@ -385,13 +398,6 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   <span>削除</span>
-                </button>
-
-                <button
-                  onClick={() => setActiveAlbum(null)}
-                  className="text-zinc-400 hover:text-zinc-100 p-1.5 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
-                >
-                  <X className="h-5 w-5" />
                 </button>
               </div>
             </div>
