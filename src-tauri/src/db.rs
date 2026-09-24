@@ -1,6 +1,5 @@
-use rusqlite::{params, Connection, Result};
 use crate::models::{Album, Playlist, TagItem, Track, TrackWithAlbum};
-
+use rusqlite::{params, Connection, Result};
 
 pub fn init_db(conn: &Connection) -> Result<()> {
     conn.execute_batch(
@@ -29,7 +28,8 @@ pub fn init_db(conn: &Connection) -> Result<()> {
 
         CREATE TABLE IF NOT EXISTS tags (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE COLLATE NOCASE
+            name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            category TEXT NOT NULL DEFAULT 'other'
         );
 
         CREATE TABLE IF NOT EXISTS album_tags (
@@ -61,8 +61,20 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_album_tags_tag ON album_tags(tag_id);
         CREATE INDEX IF NOT EXISTS idx_track_tags_tag ON track_tags(tag_id);
         CREATE INDEX IF NOT EXISTS idx_playlist_tracks ON playlist_tracks(playlist_id);
-        "
+        ",
     )?;
+
+    let has_category: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('tags') WHERE name = 'category'",
+        [],
+        |row| row.get(0),
+    )?;
+    if has_category == 0 {
+        conn.execute(
+            "ALTER TABLE tags ADD COLUMN category TEXT NOT NULL DEFAULT 'other'",
+            [],
+        )?;
+    }
 
     let _ = fix_missing_disc_numbers(conn);
 
@@ -70,7 +82,8 @@ pub fn init_db(conn: &Connection) -> Result<()> {
 }
 
 pub fn fix_missing_disc_numbers(conn: &Connection) -> Result<()> {
-    let mut stmt = conn.prepare("SELECT id, file_path FROM tracks WHERE disc_number IS NULL OR disc_number = 0")?;
+    let mut stmt = conn
+        .prepare("SELECT id, file_path FROM tracks WHERE disc_number IS NULL OR disc_number = 0")?;
     let rows = stmt.query_map([], |row| {
         Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
     })?;
@@ -86,20 +99,36 @@ pub fn fix_missing_disc_numbers(conn: &Connection) -> Result<()> {
     }
 
     for (id, disc) in updates {
-        let _ = conn.execute("UPDATE tracks SET disc_number = ?1 WHERE id = ?2", params![disc, id]);
+        let _ = conn.execute(
+            "UPDATE tracks SET disc_number = ?1 WHERE id = ?2",
+            params![disc, id],
+        );
     }
 
     Ok(())
 }
 
 pub fn get_or_create_tag(conn: &Connection, name: &str) -> Result<i64> {
+    get_or_create_tag_with_category(conn, name, "other")
+}
+
+pub fn get_or_create_tag_with_category(
+    conn: &Connection,
+    name: &str,
+    category: &str,
+) -> Result<i64> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
         return Ok(0);
     }
+    let normalized_category = match category {
+        "genre" | "artist" | "release_year" => category,
+        _ => "other",
+    };
     conn.execute(
-        "INSERT OR IGNORE INTO tags (name) VALUES (?1)",
-        params![trimmed],
+        "INSERT INTO tags (name, category) VALUES (?1, ?2)
+         ON CONFLICT(name) DO UPDATE SET category = excluded.category",
+        params![trimmed, normalized_category],
     )?;
     let tag_id: i64 = conn.query_row(
         "SELECT id FROM tags WHERE name = ?1 COLLATE NOCASE",
@@ -135,7 +164,7 @@ pub fn get_all_albums(conn: &Connection) -> Result<Vec<Album>> {
     let mut albums = Vec::new();
     for row in album_rows {
         let (id, title, artist, release_year, genre, cover_url, track_count) = row?;
-        
+
         // アルバムのタグを取得
         let mut tag_stmt = conn.prepare(
             "
@@ -144,7 +173,7 @@ pub fn get_all_albums(conn: &Connection) -> Result<Vec<Album>> {
             JOIN album_tags at ON tg.id = at.tag_id
             WHERE at.album_id = ?1
             ORDER BY tg.name COLLATE NOCASE ASC
-            "
+            ",
         )?;
         let tags: Vec<String> = tag_stmt
             .query_map(params![id], |r| r.get(0))?
@@ -203,7 +232,7 @@ pub fn get_album_tracks(conn: &Connection, album_id: i64) -> Result<Vec<Track>> 
             JOIN track_tags tt ON tg.id = tt.tag_id
             WHERE tt.track_id = ?1
             ORDER BY tg.name COLLATE NOCASE ASC
-            "
+            ",
         )?;
         track.tags = tag_stmt
             .query_map(params![track.id], |r| r.get(0))?
@@ -219,19 +248,20 @@ pub fn get_album_tracks(conn: &Connection, album_id: i64) -> Result<Vec<Track>> 
 pub fn get_all_tags(conn: &Connection) -> Result<Vec<TagItem>> {
     let mut stmt = conn.prepare(
         "
-        SELECT tg.id, tg.name,
-               (SELECT COUNT(*) FROM album_tags at WHERE at.tag_id = tg.id) as album_c,
-               (SELECT COUNT(*) FROM track_tags tt WHERE tt.tag_id = tg.id) as track_c
+         SELECT tg.id, tg.name, tg.category,
+             (SELECT COUNT(*) FROM album_tags at WHERE at.tag_id = tg.id) as album_c,
+             (SELECT COUNT(*) FROM track_tags tt WHERE tt.tag_id = tg.id) as track_c
         FROM tags tg
         ORDER BY (album_c + track_c) DESC, tg.name COLLATE NOCASE ASC
-        "
+        ",
     )?;
 
     let rows = stmt.query_map([], |row| {
         let id: i64 = row.get(0)?;
         let name: String = row.get(1)?;
-        let album_count: i64 = row.get(2)?;
-        let track_count: i64 = row.get(3)?;
+        let category: String = row.get(2)?;
+        let album_count: i64 = row.get(3)?;
+        let track_count: i64 = row.get(4)?;
         let target_type = if album_count > 0 && track_count == 0 {
             "album".to_string()
         } else if track_count > 0 && album_count == 0 {
@@ -245,6 +275,7 @@ pub fn get_all_tags(conn: &Connection) -> Result<Vec<TagItem>> {
             name,
             count: album_count + track_count,
             target_type,
+            category,
         })
     })?;
 
@@ -394,7 +425,7 @@ fn attach_tags_to_tracks(conn: &Connection, tracks: &mut [TrackWithAlbum]) -> Re
             JOIN track_tags tt ON tg.id = tt.tag_id
             WHERE tt.track_id = ?1
             ORDER BY tg.name COLLATE NOCASE ASC
-            "
+            ",
         )?;
         track.tags = tag_stmt
             .query_map(params![track.id], |r| r.get(0))?
@@ -431,7 +462,7 @@ pub fn get_all_playlists(conn: &Connection) -> Result<Vec<Playlist>> {
         LEFT JOIN playlist_tracks pt ON p.id = pt.playlist_id
         GROUP BY p.id
         ORDER BY p.id DESC
-        "
+        ",
     )?;
 
     let rows = stmt.query_map([], |row| {
@@ -490,10 +521,7 @@ pub fn get_playlist_tracks(conn: &Connection, playlist_id: i64) -> Result<Vec<Tr
 }
 
 pub fn delete_playlist(conn: &Connection, playlist_id: i64) -> Result<()> {
-    conn.execute(
-        "DELETE FROM playlists WHERE id = ?1",
-        params![playlist_id],
-    )?;
+    conn.execute("DELETE FROM playlists WHERE id = ?1", params![playlist_id])?;
     Ok(())
 }
 
@@ -505,7 +533,7 @@ pub fn get_album_tags(conn: &Connection, album_id: i64) -> Result<Vec<String>> {
         JOIN album_tags at ON tg.id = at.tag_id
         WHERE at.album_id = ?1
         ORDER BY tg.name COLLATE NOCASE ASC
-        "
+        ",
     )?;
     let tags = stmt
         .query_map(params![album_id], |r| r.get(0))?
@@ -522,7 +550,7 @@ pub fn get_track_tags(conn: &Connection, track_id: i64) -> Result<Vec<String>> {
         JOIN track_tags tt ON tg.id = tt.tag_id
         WHERE tt.track_id = ?1
         ORDER BY tg.name COLLATE NOCASE ASC
-        "
+        ",
     )?;
     let tags = stmt
         .query_map(params![track_id], |r| r.get(0))?
@@ -531,8 +559,13 @@ pub fn get_track_tags(conn: &Connection, track_id: i64) -> Result<Vec<String>> {
     Ok(tags)
 }
 
-pub fn add_album_tag(conn: &Connection, album_id: i64, tag_name: &str) -> Result<Vec<String>> {
-    let tag_id = get_or_create_tag(conn, tag_name)?;
+pub fn add_album_tag(
+    conn: &Connection,
+    album_id: i64,
+    tag_name: &str,
+    category: &str,
+) -> Result<Vec<String>> {
+    let tag_id = get_or_create_tag_with_category(conn, tag_name, category)?;
     if tag_id > 0 {
         conn.execute(
             "INSERT OR IGNORE INTO album_tags (album_id, tag_id) VALUES (?1, ?2)",
@@ -558,8 +591,13 @@ pub fn remove_album_tag(conn: &Connection, album_id: i64, tag_name: &str) -> Res
     get_album_tags(conn, album_id)
 }
 
-pub fn add_track_tag(conn: &Connection, track_id: i64, tag_name: &str) -> Result<Vec<String>> {
-    let tag_id = get_or_create_tag(conn, tag_name)?;
+pub fn add_track_tag(
+    conn: &Connection,
+    track_id: i64,
+    tag_name: &str,
+    category: &str,
+) -> Result<Vec<String>> {
+    let tag_id = get_or_create_tag_with_category(conn, tag_name, category)?;
     if tag_id > 0 {
         conn.execute(
             "INSERT OR IGNORE INTO track_tags (track_id, tag_id) VALUES (?1, ?2)",
@@ -610,20 +648,14 @@ pub fn delete_album(conn: &mut Connection, album_id: i64) -> Result<()> {
         params![album_id],
     )?;
 
-    tx.execute(
-        "DELETE FROM tracks WHERE album_id = ?1",
-        params![album_id],
-    )?;
+    tx.execute("DELETE FROM tracks WHERE album_id = ?1", params![album_id])?;
 
     tx.execute(
         "DELETE FROM album_tags WHERE album_id = ?1",
         params![album_id],
     )?;
 
-    tx.execute(
-        "DELETE FROM albums WHERE id = ?1",
-        params![album_id],
-    )?;
+    tx.execute("DELETE FROM albums WHERE id = ?1", params![album_id])?;
 
     tx.commit()?;
 
@@ -631,5 +663,3 @@ pub fn delete_album(conn: &mut Connection, album_id: i64) -> Result<()> {
 
     Ok(())
 }
-
-

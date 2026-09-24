@@ -15,8 +15,8 @@ pub struct TagItem {
     pub name: String,
     pub count: i64,
     pub target_type: String, // "album" または "track"
+    pub category: String,    // "genre", "artist", "release_year", "other"
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Track {
@@ -56,7 +56,6 @@ pub struct Playlist {
     pub track_count: usize,
     pub created_at: String,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Album {

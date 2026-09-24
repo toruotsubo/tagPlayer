@@ -9,7 +9,7 @@ use rusqlite::{params, Connection};
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
-use crate::db::{get_all_albums, get_all_tags, get_or_create_tag};
+use crate::db::{get_all_albums, get_all_tags, get_or_create_tag_with_category};
 use crate::models::{LibraryData, RawTrackMeta};
 
 const SUPPORTED_EXTENSIONS: &[&str] = &["mp3", "flac", "m4a", "wma", "wav", "ogg", "aac"];
@@ -886,7 +886,16 @@ pub fn scan_and_save_directory(
         );
 
         for at in album_tags {
-            if let Ok(tag_id) = get_or_create_tag(&tx, &at) {
+            let category = if group.genre.as_deref() == Some(at.as_str()) {
+                "genre"
+            } else if at == group.artist {
+                "artist"
+            } else if group.year.map(|year| year.to_string()) == Some(at.clone()) {
+                "release_year"
+            } else {
+                "other"
+            };
+            if let Ok(tag_id) = get_or_create_tag_with_category(&tx, &at, category) {
                 if tag_id > 0 {
                     let _ = tx.execute(
                         "INSERT OR IGNORE INTO album_tags (album_id, tag_id) VALUES (?1, ?2)",
@@ -940,7 +949,12 @@ pub fn scan_and_save_directory(
             );
 
             for tt in track_tags {
-                if let Ok(tag_id) = get_or_create_tag(&tx, &tt) {
+                let category = if track_meta.track_artist.as_deref() == Some(tt.as_str()) {
+                    "artist"
+                } else {
+                    "other"
+                };
+                if let Ok(tag_id) = get_or_create_tag_with_category(&tx, &tt, category) {
                     if tag_id > 0 {
                         let _ = tx.execute(
                             "INSERT OR IGNORE INTO track_tags (track_id, tag_id) VALUES (?1, ?2)",

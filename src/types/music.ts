@@ -1,8 +1,11 @@
+export type TagCategory = "genre" | "artist" | "release_year" | "other";
+
 export interface TagItem {
   id: number;
   name: string;
   count: number;
   target_type: "album" | "track" | "all";
+  category: TagCategory;
 }
 
 export interface Track {

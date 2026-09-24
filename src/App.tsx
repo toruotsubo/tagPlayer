@@ -220,9 +220,12 @@ function App() {
   };
 
   // 指定インデックスの曲を再生
-  const handlePlayTrackAtIndex = async (index: number) => {
-    if (index < 0 || index >= queue.length) return;
-    const track = queue[index];
+  const handlePlayTrackAtIndex = async (
+    index: number,
+    queueToPlay: TrackWithAlbum[] = queue
+  ) => {
+    if (index < 0 || index >= queueToPlay.length) return;
+    const track = queueToPlay[index];
     setCurrentIndex(index);
     setPositionSecs(0);
     setDurationSecs(track.duration_secs);
@@ -259,7 +262,7 @@ function App() {
       const newQueue = [...queue];
       newQueue.splice(insertIdx, 0, trackWithAlbum);
       setQueue(newQueue);
-      handlePlayTrackAtIndex(insertIdx);
+      handlePlayTrackAtIndex(insertIdx, newQueue);
     }
   };
 
@@ -342,7 +345,7 @@ function App() {
   const handlePlayAllTracks = (tracks: TrackWithAlbum[]) => {
     if (tracks.length === 0) return;
     setQueue(tracks);
-    handlePlayTrackAtIndex(0);
+    handlePlayTrackAtIndex(0, tracks);
   };
 
   // 一致曲すべてをキューの末尾に追加
@@ -621,6 +624,7 @@ function App() {
         {/* Sidebar */}
         <TagSidebar
           tags={library.tags}
+          viewMode={viewMode}
           selectedTags={selectedTags}
           matchAll={matchAll}
           onToggleMatchMode={() => setMatchAll(!matchAll)}
@@ -639,11 +643,10 @@ function App() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handleSwitchViewMode("albums")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
-                  viewMode === "albums"
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${viewMode === "albums"
                     ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
-                }`}
+                  }`}
               >
                 <Disc3 className="h-3.5 w-3.5" />
                 <span>アルバム</span>
@@ -654,11 +657,10 @@ function App() {
 
               <button
                 onClick={() => handleSwitchViewMode("tracks")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${
-                  viewMode === "tracks"
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${viewMode === "tracks"
                     ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60"
                     : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
-                }`}
+                  }`}
               >
                 <Music2 className="h-3.5 w-3.5" />
                 <span>曲</span>
@@ -780,9 +782,8 @@ function App() {
             {/* Shuffle Button */}
             <button
               onClick={() => setShuffle(!shuffle)}
-              className={`p-1 rounded transition cursor-pointer ${
-                shuffle ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"
-              }`}
+              className={`p-1 rounded transition cursor-pointer ${shuffle ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"
+                }`}
               title={shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
             >
               <Shuffle className="h-3.5 w-3.5" />
@@ -825,9 +826,8 @@ function App() {
             {/* Repeat Button */}
             <button
               onClick={handleCycleRepeat}
-              className={`p-1 rounded transition cursor-pointer ${
-                repeatMode !== "off" ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"
-              }`}
+              className={`p-1 rounded transition cursor-pointer ${repeatMode !== "off" ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"
+                }`}
               title={`リピート: ${repeatMode === "off" ? "オフ" : repeatMode === "all" ? "全曲" : "1曲"}`}
             >
               {repeatMode === "one" ? (
@@ -900,11 +900,10 @@ function App() {
           {/* Queue Drawer Button */}
           <button
             onClick={() => setIsQueueOpen(!isQueueOpen)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition cursor-pointer text-xs ${
-              isQueueOpen
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition cursor-pointer text-xs ${isQueueOpen
                 ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40"
                 : "bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 border-zinc-700/60"
-            }`}
+              }`}
             title="再生キューを表示"
           >
             <ListMusic className="h-3.5 w-3.5" />

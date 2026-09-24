@@ -166,10 +166,11 @@ async fn add_album_tag(
     app_handle: tauri::AppHandle,
     album_id: i64,
     tag_name: String,
+    category: String,
 ) -> Result<Vec<String>, String> {
     let db_path = get_db_path(&app_handle)?;
     let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
-    db::add_album_tag(&conn, album_id, &tag_name).map_err(|e| e.to_string())
+    db::add_album_tag(&conn, album_id, &tag_name, &category).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -188,10 +189,11 @@ async fn add_track_tag(
     app_handle: tauri::AppHandle,
     track_id: i64,
     tag_name: String,
+    category: String,
 ) -> Result<Vec<String>, String> {
     let db_path = get_db_path(&app_handle)?;
     let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
-    db::add_track_tag(&conn, track_id, &tag_name).map_err(|e| e.to_string())
+    db::add_track_tag(&conn, track_id, &tag_name, &category).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

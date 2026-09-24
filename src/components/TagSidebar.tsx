@@ -8,10 +8,11 @@ import {
   Trash2,
   SlidersHorizontal,
 } from "lucide-react";
-import { Playlist, TagItem } from "../types/music";
+import { Playlist, TagCategory, TagItem } from "../types/music";
 
 interface TagSidebarProps {
   tags: TagItem[];
+  viewMode: "albums" | "tracks";
   selectedTags: string[];
   matchAll: boolean;
   onToggleMatchMode: () => void;
@@ -25,6 +26,7 @@ interface TagSidebarProps {
 
 export const TagSidebar: React.FC<TagSidebarProps> = ({
   tags,
+  viewMode,
   selectedTags,
   matchAll,
   onToggleMatchMode,
@@ -37,15 +39,28 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"tags" | "playlists">("tags");
-  const [tagCategory, setTagCategory] = useState<"all" | "album" | "track">("all");
+  const [tagCategory, setTagCategory] = useState<"all" | TagCategory>("all");
+
+  const categoryLabels: Record<"all" | TagCategory, string> = {
+    all: "全種",
+    genre: "ジャンル",
+    artist: "アーティスト",
+    release_year: "リリース年",
+    other: "その他",
+  };
+
+  const categoryDotClasses: Record<TagCategory, string> = {
+    genre: "bg-amber-400",
+    artist: "bg-emerald-400",
+    release_year: "bg-sky-400",
+    other: "bg-indigo-400",
+  };
 
   const filteredTags = tags.filter((t) => {
     const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
-    if (tagCategory === "all") return true;
-    if (tagCategory === "album") return t.target_type === "album" || t.target_type === "all";
-    if (tagCategory === "track") return t.target_type === "track" || t.target_type === "all";
-    return true;
+    if (viewMode === "albums" && t.target_type === "track") return false;
+    return tagCategory === "all" || t.category === tagCategory;
   });
 
   return (
@@ -54,21 +69,19 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
       <div className="flex rounded-lg bg-zinc-950/60 p-0.5 border border-zinc-800/60 text-xs">
         <button
           onClick={() => setActiveTab("tags")}
-          className={`flex-1 py-1.5 text-center rounded-md transition font-medium flex items-center justify-center gap-1.5 cursor-pointer ${
-            activeTab === "tags"
+          className={`flex-1 py-1.5 text-center rounded-md transition font-medium flex items-center justify-center gap-1.5 cursor-pointer ${activeTab === "tags"
               ? "bg-zinc-800 text-zinc-100 shadow-sm"
               : "text-zinc-400 hover:text-zinc-200"
-          }`}
+            }`}
         >
           <Tag className="h-3.5 w-3.5" /> タグ
         </button>
         <button
           onClick={() => setActiveTab("playlists")}
-          className={`flex-1 py-1.5 text-center rounded-md transition font-medium flex items-center justify-center gap-1.5 cursor-pointer ${
-            activeTab === "playlists"
+          className={`flex-1 py-1.5 text-center rounded-md transition font-medium flex items-center justify-center gap-1.5 cursor-pointer ${activeTab === "playlists"
               ? "bg-zinc-800 text-zinc-100 shadow-sm"
               : "text-zinc-400 hover:text-zinc-200"
-          }`}
+            }`}
         >
           <ListMusic className="h-3.5 w-3.5" /> プレイリスト ({playlists.length})
         </button>
@@ -125,19 +138,18 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
             />
           </div>
 
-          {/* Sub Categories: all / album / track */}
-          <div className="flex gap-1 text-[11px]">
-            {(["all", "album", "track"] as const).map((cat) => (
+          {/* Tag categories */}
+          <div className="flex flex-wrap gap-1 text-[11px]">
+            {(["all", "genre", "artist", "release_year", "other"] as const).map((cat) => (
               <button
                 key={cat}
                 onClick={() => setTagCategory(cat)}
-                className={`px-2.5 py-0.5 rounded transition cursor-pointer ${
-                  tagCategory === cat
+                className={`px-2.5 py-0.5 rounded transition cursor-pointer ${tagCategory === cat
                     ? "bg-zinc-800 text-zinc-200 font-medium"
                     : "text-zinc-500 hover:text-zinc-300"
-                }`}
+                  }`}
               >
-                {cat === "all" ? "全種" : cat === "album" ? "アルバム" : "曲"}
+                {categoryLabels[cat]}
               </button>
             ))}
           </div>
@@ -155,21 +167,15 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
                   <button
                     key={tag.id}
                     onClick={() => onToggleTag(tag.name)}
-                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition text-left cursor-pointer group ${
-                      isSelected
+                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition text-left cursor-pointer group ${isSelected
                         ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/40 font-medium"
                         : "text-zinc-300 hover:bg-zinc-800/60 hover:text-zinc-100 border border-transparent"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2 truncate">
                       <span
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          tag.target_type === "album"
-                            ? "bg-amber-400"
-                            : tag.target_type === "track"
-                            ? "bg-emerald-400"
-                            : "bg-indigo-400"
-                        }`}
+                        className={`h-1.5 w-1.5 rounded-full ${categoryDotClasses[tag.category]
+                          }`}
                       />
                       <span className="truncate">{tag.name}</span>
                     </div>
@@ -186,16 +192,13 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
           </div>
 
           {/* Footer Legend */}
-          <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-[10px] text-zinc-500">
-            <span className="flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> アルバム
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> 曲
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" /> 共通
-            </span>
+          <div className="pt-2 border-t border-zinc-800/60 grid grid-cols-2 gap-y-1 text-[10px] text-zinc-500">
+            {(Object.keys(categoryDotClasses) as TagCategory[]).map((category) => (
+              <span key={category} className="flex items-center gap-1">
+                <span className={`h-1.5 w-1.5 rounded-full ${categoryDotClasses[category]}`} />
+                {categoryLabels[category]}
+              </span>
+            ))}
           </div>
         </>
       ) : (
