@@ -64,9 +64,16 @@ export const TrackList: React.FC<TrackListProps> = ({
   };
 
   const getSuggestions = (trackTags: string[]) => {
-    return availableTags
-      .filter((t) => !trackTags.includes(t.name) && !/^\d{4}$/.test(t.name))
-      .slice(0, 4);
+    const query = newTagInput.trim().toLowerCase();
+    const candidateTags = availableTags
+      .filter((t) => !trackTags.includes(t.name) && !/^\d{4}$/.test(t.name));
+
+    if (!query) {
+      return candidateTags.slice(0, 4);
+    }
+    return candidateTags
+      .filter((t) => t.name.toLowerCase().includes(query))
+      .slice(0, 5);
   };
 
   if (loading) {
@@ -275,7 +282,10 @@ export const TrackList: React.FC<TrackListProps> = ({
                           </button>
                         ))}
                         <button
-                          onClick={() => setEditingTrackId(null)}
+                          onClick={() => {
+                            setEditingTrackId(null);
+                            setNewTagInput("");
+                          }}
                           className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
                         >
                           <X className="h-3 w-3" />

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Disc3, Music, Calendar, Clock, X, Tag, Plus, Play, ListPlus, Volume2, Trash2 } from "lucide-react";
 import { Album, TagCategory, TagItem, Track } from "../types/music";
 import { invoke } from "@tauri-apps/api/core";
@@ -175,6 +175,43 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
     return `${mins}:${remaining.toString().padStart(2, "0")}`;
   };
 
+  // アルバムタグ用サジェスト（現在のアルバムが持っていない既存タグ、4桁数字タグは除外。入力に応じてリアルタイム絞り込み）
+  const albumTagSuggestions = useMemo(() => {
+    if (!activeAlbum) return [];
+    const query = newAlbumTag.trim().toLowerCase();
+    const candidateTags = availableTags.filter(
+      (t) => !activeAlbum.tags.includes(t.name) && !/^\d{4}$/.test(t.name)
+    );
+
+    if (!query) {
+      return candidateTags.slice(0, 8);
+    }
+    return candidateTags
+      .filter((t) => t.name.toLowerCase().includes(query))
+      .slice(0, 10);
+  }, [activeAlbum, availableTags, newAlbumTag]);
+
+  // モーダル内トラックタグ用サジェスト（入力に応じてリアルタイム絞り込み）
+  const trackTagSuggestions = useMemo(() => {
+    if (!editingTrackId) return [];
+    const currentTrack = tracks.find((t) => t.id === editingTrackId);
+    if (!currentTrack) return [];
+    const query = newTrackTag.trim().toLowerCase();
+    const candidateTags = availableTags.filter(
+      (t) => !currentTrack.tags.includes(t.name) && !/^\d{4}$/.test(t.name)
+    );
+
+    if (!query) {
+      return candidateTags.slice(0, 6);
+    }
+    return candidateTags
+      .filter((t) => t.name.toLowerCase().includes(query))
+      .slice(0, 8);
+  }, [editingTrackId, tracks, availableTags, newTrackTag]);
+
+  const getTagCategory = (tagName: string): TagCategory =>
+    availableTags.find((tag) => tag.name.toLowerCase() === tagName.toLowerCase())?.category ?? "other";
+
   if (albums.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center py-20">
@@ -194,16 +231,6 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
       </div>
     );
   }
-
-  // アルバムタグ用サジェスト（現在のアルバムが持っていない既存タグ、4桁数字タグは除外）
-  const albumTagSuggestions = activeAlbum
-    ? availableTags
-      .filter((t) => !activeAlbum.tags.includes(t.name) && !/^\d{4}$/.test(t.name))
-      .slice(0, 8)
-    : [];
-
-  const getTagCategory = (tagName: string): TagCategory =>
-    availableTags.find((tag) => tag.name.toLowerCase() === tagName.toLowerCase())?.category ?? "other";
 
   return (
     <div className="relative">
@@ -331,7 +358,16 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                           <input
                             type="text"
                             value={newAlbumTag}
-                            onChange={(e) => setNewAlbumTag(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setNewAlbumTag(val);
+                              const matched = availableTags.find(
+                                (t) => t.name.toLowerCase() === val.trim().toLowerCase()
+                              );
+                              if (matched) {
+                                setNewAlbumTagCategory(matched.category);
+                              }
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") handleAddAlbumTag(newAlbumTag);
                               if (e.key === "Escape") setIsAddingAlbumTag(false);
@@ -357,7 +393,10 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                             追加
                           </button>
                           <button
-                            onClick={() => setIsAddingAlbumTag(false)}
+                            onClick={() => {
+                              setIsAddingAlbumTag(false);
+                              setNewAlbumTag("");
+                            }}
                             className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
                           >
                             <X className="h-3 w-3" />
@@ -374,18 +413,25 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                     </div>
 
                     {/* Tag Suggestions for Album */}
-                    {isAddingAlbumTag && albumTagSuggestions.length > 0 && (
+                    {isAddingAlbumTag && (
                       <div className="flex flex-wrap items-center gap-1 mt-2 text-[9px] text-zinc-500">
-                        <span>候補:</span>
-                        {albumTagSuggestions.map((s) => (
-                          <button
-                            key={s.id}
-                            onClick={() => handleAddAlbumTag(s.name)}
-                            className="px-1.5 py-0.2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition cursor-pointer"
-                          >
-                            +{s.name}
-                          </button>
-                        ))}
+                        <span>{newAlbumTag.trim() ? "候補:" : "よく使う候補:"}</span>
+                        {albumTagSuggestions.length > 0 ? (
+                          albumTagSuggestions.map((s) => (
+                            <button
+                              key={s.id}
+                              onClick={() => handleAddAlbumTag(s.name, s.category)}
+                              className={`px-1.5 py-0.5 rounded border text-[9px] transition cursor-pointer flex items-center gap-0.5 hover:brightness-125 ${
+                                tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
+                              }`}
+                              title={`タグ「${s.name}」(${tagCategories.find(c => c.value === s.category)?.label || s.category}) を追加`}
+                            >
+                              <span>+{s.name}</span>
+                            </button>
+                          ))
+                        ) : newAlbumTag.trim() ? (
+                          <span className="text-zinc-500 italic">一致する候補がありません（Enterで新規追加）</span>
+                        ) : null}
                       </div>
                     )}
                   </div>
@@ -527,41 +573,72 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
 
                                 {/* Add Track Tag input / button */}
                                 {editingTrackId === track.id ? (
-                                  <div className="flex items-center gap-1">
-                                    <input
-                                      type="text"
-                                      value={newTrackTag}
-                                      onChange={(e) => setNewTrackTag(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter") handleAddTrackTag(track.id, newTrackTag);
-                                        if (e.key === "Escape") setEditingTrackId(null);
-                                      }}
-                                      placeholder="曲タグ..."
-                                      autoFocus
-                                      className="text-[9px] px-1.5 py-0.2 rounded bg-zinc-950 border border-emerald-500/60 text-zinc-100 w-16 focus:outline-none"
-                                    />
-                                    <select
-                                      value={newTrackTagCategory}
-                                      onChange={(e) => setNewTrackTagCategory(e.target.value as TagCategory)}
-                                      className="text-[9px] px-1 py-0.2 rounded bg-zinc-950 border border-zinc-700 text-zinc-300 focus:outline-none"
-                                      aria-label="曲タグの分類"
-                                    >
-                                      {tagCategories.map((category) => (
-                                        <option key={category.value} value={category.value}>{category.label}</option>
-                                      ))}
-                                    </select>
-                                    <button
-                                      onClick={() => handleAddTrackTag(track.id, newTrackTag)}
-                                      className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-600 text-white hover:bg-emerald-500 cursor-pointer"
-                                    >
-                                      追加
-                                    </button>
-                                    <button
-                                      onClick={() => setEditingTrackId(null)}
-                                      className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
-                                    >
-                                      <X className="h-2.5 w-2.5" />
-                                    </button>
+                                  <div className="flex flex-col items-start gap-1">
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="text"
+                                        value={newTrackTag}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setNewTrackTag(val);
+                                          const matched = availableTags.find(
+                                            (t) => t.name.toLowerCase() === val.trim().toLowerCase()
+                                          );
+                                          if (matched) {
+                                            setNewTrackTagCategory(matched.category);
+                                          }
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") handleAddTrackTag(track.id, newTrackTag);
+                                          if (e.key === "Escape") setEditingTrackId(null);
+                                        }}
+                                        placeholder="曲タグ..."
+                                        autoFocus
+                                        className="text-[9px] px-1.5 py-0.2 rounded bg-zinc-950 border border-emerald-500/60 text-zinc-100 w-16 focus:outline-none"
+                                      />
+                                      <select
+                                        value={newTrackTagCategory}
+                                        onChange={(e) => setNewTrackTagCategory(e.target.value as TagCategory)}
+                                        className="text-[9px] px-1 py-0.2 rounded bg-zinc-950 border border-zinc-700 text-zinc-300 focus:outline-none"
+                                        aria-label="曲タグの分類"
+                                      >
+                                        {tagCategories.map((category) => (
+                                          <option key={category.value} value={category.value}>{category.label}</option>
+                                        ))}
+                                      </select>
+                                      <button
+                                        onClick={() => handleAddTrackTag(track.id, newTrackTag)}
+                                        className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-600 text-white hover:bg-emerald-500 cursor-pointer"
+                                      >
+                                        追加
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setEditingTrackId(null);
+                                          setNewTrackTag("");
+                                        }}
+                                        className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                                      >
+                                        <X className="h-2.5 w-2.5" />
+                                      </button>
+                                    </div>
+                                    {trackTagSuggestions.length > 0 && (
+                                      <div className="flex flex-wrap items-center gap-1 mt-0.5 text-[8px] text-zinc-500">
+                                        <span>候補:</span>
+                                        {trackTagSuggestions.map((s) => (
+                                          <button
+                                            key={s.id}
+                                            onClick={() => handleAddTrackTag(track.id, s.name, s.category)}
+                                            className={`px-1 py-0.2 rounded border text-[8px] transition cursor-pointer hover:brightness-125 ${
+                                              tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
+                                            }`}
+                                            title={`タグ「${s.name}」(${tagCategories.find(c => c.value === s.category)?.label || s.category}) を追加`}
+                                          >
+                                            +{s.name}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <button
