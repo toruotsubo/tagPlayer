@@ -26,6 +26,7 @@ import {
   PlaybackStatus,
   Playlist,
   RepeatMode,
+  TagCategory,
   Track,
   TrackWithAlbum,
 } from "./types/music";
@@ -356,11 +357,16 @@ function App() {
   };
 
   // トラックへのタグ追加
-  const handleAddTrackTag = async (trackId: number, tagName: string) => {
+  const handleAddTrackTag = async (
+    trackId: number,
+    tagName: string,
+    category: TagCategory = "other"
+  ) => {
     try {
       const updatedTags = await invoke<string[]>("add_track_tag", {
         trackId,
         tagName: tagName.trim(),
+        category,
       });
       setTagTracks((prev) =>
         prev.map((t) => (t.id === trackId ? { ...t, tags: updatedTags } : t))

@@ -9,7 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { TagItem, TrackWithAlbum } from "../types/music";
+import { TagCategory, TagItem, TrackWithAlbum } from "../types/music";
 
 interface TrackListProps {
   tracks: TrackWithAlbum[];
@@ -23,9 +23,23 @@ interface TrackListProps {
   onPlayAll?: (tracks: TrackWithAlbum[]) => void;
   onQueueAll?: (tracks: TrackWithAlbum[]) => void;
   onToggleTag?: (tagName: string) => void;
-  onAddTrackTag?: (trackId: number, tagName: string) => Promise<void>;
+  onAddTrackTag?: (trackId: number, tagName: string, category?: TagCategory) => Promise<void>;
   onRemoveTrackTag?: (trackId: number, tagName: string) => Promise<void>;
 }
+
+const tagCategories: { value: TagCategory; label: string }[] = [
+  { value: "genre", label: "ジャンル" },
+  { value: "artist", label: "アーティスト" },
+  { value: "release_year", label: "リリース年" },
+  { value: "other", label: "その他" },
+];
+
+const tagColorClasses: Record<TagCategory, string> = {
+  genre: "bg-amber-500/10 text-amber-300 border-amber-500/30",
+  artist: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  release_year: "bg-sky-500/10 text-sky-300 border-sky-500/30",
+  other: "bg-indigo-500/10 text-indigo-300 border-indigo-500/30",
+};
 
 export const TrackList: React.FC<TrackListProps> = ({
   tracks,
@@ -44,6 +58,10 @@ export const TrackList: React.FC<TrackListProps> = ({
 }) => {
   const [editingTrackId, setEditingTrackId] = useState<number | null>(null);
   const [newTagInput, setNewTagInput] = useState("");
+  const [newTagCategory, setNewTagCategory] = useState<TagCategory>("other");
+
+  const getTagCategory = (tagName: string): TagCategory =>
+    availableTags.find((tag) => tag.name.toLowerCase() === tagName.toLowerCase())?.category ?? "other";
 
   const formatDuration = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -51,12 +69,17 @@ export const TrackList: React.FC<TrackListProps> = ({
     return `${mins}:${remaining.toString().padStart(2, "0")}`;
   };
 
-  const handleAddTagSubmit = async (trackId: number, tagName?: string) => {
+  const handleAddTagSubmit = async (
+    trackId: number,
+    tagName?: string,
+    category = newTagCategory
+  ) => {
     const targetTag = (tagName ?? newTagInput).trim();
     if (!targetTag || !onAddTrackTag) return;
     try {
-      await onAddTrackTag(trackId, targetTag);
+      await onAddTrackTag(trackId, targetTag, category);
       setNewTagInput("");
+      setNewTagCategory("other");
       setEditingTrackId(null);
     } catch (err) {
       console.error("Add tag error", err);
@@ -220,13 +243,16 @@ export const TrackList: React.FC<TrackListProps> = ({
                 {track.tags &&
                   track.tags.map((t, tIdx) => {
                     const isTagSelected = selectedTags.includes(t);
+                    const category = getTagCategory(t);
                     return (
                       <span
                         key={tIdx}
                         className={`inline-flex items-center gap-1 text-[10px] pl-2 pr-1.5 py-0.5 rounded-full border transition ${
+                          tagColorClasses[category]
+                        } ${
                           isTagSelected
-                            ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/40"
-                            : "bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 border-zinc-700/40 hover:border-zinc-600"
+                            ? "ring-2 ring-indigo-400 font-semibold brightness-125"
+                            : "hover:brightness-110"
                         }`}
                       >
                         <span
@@ -256,7 +282,16 @@ export const TrackList: React.FC<TrackListProps> = ({
                         <input
                           type="text"
                           value={newTagInput}
-                          onChange={(e) => setNewTagInput(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setNewTagInput(val);
+                            const matched = availableTags.find(
+                              (t) => t.name.toLowerCase() === val.trim().toLowerCase()
+                            );
+                            if (matched) {
+                              setNewTagCategory(matched.category);
+                            }
+                          }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") handleAddTagSubmit(track.id);
                             if (e.key === "Escape") setEditingTrackId(null);
@@ -265,6 +300,16 @@ export const TrackList: React.FC<TrackListProps> = ({
                           autoFocus
                           className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-950 border border-emerald-500/60 text-zinc-100 w-20 focus:outline-none"
                         />
+                        <select
+                          value={newTagCategory}
+                          onChange={(e) => setNewTagCategory(e.target.value as TagCategory)}
+                          className="text-[10px] px-1 py-0.5 rounded bg-zinc-950 border border-zinc-700 text-zinc-300 focus:outline-none"
+                          aria-label="曲タグの分類"
+                        >
+                          {tagCategories.map((c) => (
+                            <option key={c.value} value={c.value}>{c.label}</option>
+                          ))}
+                        </select>
                         <button
                           onClick={() => handleAddTagSubmit(track.id)}
                           className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600 text-white hover:bg-emerald-500 cursor-pointer"
@@ -274,9 +319,13 @@ export const TrackList: React.FC<TrackListProps> = ({
                         {getSuggestions(track.tags || []).map((s) => (
                           <button
                             key={s.id}
-                            onClick={() => handleAddTagSubmit(track.id, s.name)}
-                            className="text-[9px] px-1.5 py-0.2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition cursor-pointer"
-                            title={`タグ「${s.name}」を追加`}
+                            onClick={() => handleAddTagSubmit(track.id, s.name, s.category)}
+                            className={`text-[9px] px-1.5 py-0.2 rounded border transition cursor-pointer hover:brightness-125 ${
+                              tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
+                            }`}
+                            title={`タグ「${s.name}」(${
+                              tagCategories.find((c) => c.value === s.category)?.label || s.category
+                            }) を追加`}
                           >
                             +{s.name}
                           </button>
@@ -285,6 +334,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                           onClick={() => {
                             setEditingTrackId(null);
                             setNewTagInput("");
+                            setNewTagCategory("other");
                           }}
                           className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
                         >
@@ -296,6 +346,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                         onClick={() => {
                           setEditingTrackId(track.id);
                           setNewTagInput("");
+                          setNewTagCategory("other");
                         }}
                         className="opacity-0 group-hover:opacity-100 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-400 hover:text-zinc-200 border border-zinc-700/40 transition cursor-pointer"
                         title="曲にタグを追加"

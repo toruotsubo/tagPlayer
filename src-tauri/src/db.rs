@@ -623,6 +623,52 @@ pub fn remove_track_tag(conn: &Connection, track_id: i64, tag_name: &str) -> Res
     get_track_tags(conn, track_id)
 }
 
+pub fn add_tracks_tag(
+    conn: &mut Connection,
+    track_ids: &[i64],
+    tag_name: &str,
+    category: &str,
+) -> Result<()> {
+    let tag_id = get_or_create_tag_with_category(conn, tag_name, category)?;
+    if tag_id > 0 && !track_ids.is_empty() {
+        let tx = conn.transaction()?;
+        {
+            let mut stmt = tx.prepare("INSERT OR IGNORE INTO track_tags (track_id, tag_id) VALUES (?1, ?2)")?;
+            for &tid in track_ids {
+                stmt.execute(params![tid, tag_id])?;
+            }
+        }
+        tx.commit()?;
+    }
+    Ok(())
+}
+
+pub fn remove_tracks_tag(
+    conn: &mut Connection,
+    track_ids: &[i64],
+    tag_name: &str,
+) -> Result<()> {
+    let tag_id_res: Result<i64, _> = conn.query_row(
+        "SELECT id FROM tags WHERE name = ?1 COLLATE NOCASE",
+        params![tag_name.trim()],
+        |r| r.get(0),
+    );
+    if let Ok(tag_id) = tag_id_res {
+        if !track_ids.is_empty() {
+            let tx = conn.transaction()?;
+            {
+                let mut stmt = tx.prepare("DELETE FROM track_tags WHERE track_id = ?1 AND tag_id = ?2")?;
+                for &tid in track_ids {
+                    stmt.execute(params![tid, tag_id])?;
+                }
+            }
+            tx.commit()?;
+            let _ = cleanup_unused_tags(conn);
+        }
+    }
+    Ok(())
+}
+
 pub fn cleanup_unused_tags(conn: &Connection) -> Result<()> {
     conn.execute(
         "

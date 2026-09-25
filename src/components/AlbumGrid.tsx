@@ -1,5 +1,20 @@
 import React, { useState, useMemo } from "react";
-import { Disc3, Music, Calendar, Clock, X, Tag, Plus, Play, ListPlus, Volume2, Trash2 } from "lucide-react";
+import {
+  Disc3,
+  Music,
+  Calendar,
+  Clock,
+  X,
+  Tag,
+  Plus,
+  Play,
+  ListPlus,
+  Volume2,
+  Trash2,
+  CheckSquare,
+  Square,
+  MinusSquare,
+} from "lucide-react";
 import { Album, TagCategory, TagItem, Track } from "../types/music";
 import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -52,6 +67,14 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   const [loadingTracks, setLoadingTracks] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Track selection state for batch tag editing
+  const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set());
+  const [lastSelectedTrackIndex, setLastSelectedTrackIndex] = useState<number | null>(null);
+
+  // Batch Track Tag Edit state
+  const [batchTrackTag, setBatchTrackTag] = useState("");
+  const [batchTrackTagCategory, setBatchTrackTagCategory] = useState<TagCategory>("other");
+
   // Album Tag Edit state
   const [isAddingAlbumTag, setIsAddingAlbumTag] = useState(false);
   const [newAlbumTag, setNewAlbumTag] = useState("");
@@ -64,6 +87,9 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
 
   const handleAlbumClick = async (album: Album) => {
     setActiveAlbum(album);
+    setSelectedTrackIds(new Set());
+    setLastSelectedTrackIndex(null);
+    setBatchTrackTag("");
     setLoadingTracks(true);
     try {
       const result = await invoke<Track[]>("get_album_tracks", { albumId: album.id });
@@ -144,6 +170,144 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
       console.error("Remove track tag error", err);
     }
   };
+
+  // ソート済みトラックリスト（モーダル内外で一貫して使用）
+  const sortedTracks = useMemo(() => {
+    return [...tracks].sort((a, b) => {
+      const discA = a.disc_number ?? 1;
+      const discB = b.disc_number ?? 1;
+      if (discA !== discB) return discA - discB;
+      const trackA = a.track_number ?? 9999;
+      const trackB = b.track_number ?? 9999;
+      if (trackA !== trackB) return trackA - trackB;
+      return a.title.localeCompare(b.title);
+    });
+  }, [tracks]);
+
+  // 全曲選択 / 全解除トグル
+  const handleToggleSelectAll = () => {
+    if (selectedTrackIds.size === sortedTracks.length && sortedTracks.length > 0) {
+      setSelectedTrackIds(new Set());
+    } else {
+      setSelectedTrackIds(new Set(sortedTracks.map((t) => t.id)));
+    }
+  };
+
+  // トラック選択トグル（Shift+クリックで範囲選択対応）
+  const handleToggleTrackSelect = (
+    trackId: number,
+    index: number,
+    event: React.MouseEvent
+  ) => {
+    event.stopPropagation();
+    const newSelected = new Set(selectedTrackIds);
+
+    if (event.shiftKey && lastSelectedTrackIndex !== null) {
+      const start = Math.min(lastSelectedTrackIndex, index);
+      const end = Math.max(lastSelectedTrackIndex, index);
+      const shouldSelect = !selectedTrackIds.has(trackId);
+
+      for (let i = start; i <= end; i++) {
+        const id = sortedTracks[i]?.id;
+        if (id !== undefined) {
+          if (shouldSelect) {
+            newSelected.add(id);
+          } else {
+            newSelected.delete(id);
+          }
+        }
+      }
+    } else {
+      if (newSelected.has(trackId)) {
+        newSelected.delete(trackId);
+      } else {
+        newSelected.add(trackId);
+      }
+      setLastSelectedTrackIndex(index);
+    }
+
+    setSelectedTrackIds(newSelected);
+  };
+
+  // 複数曲へのタグ一括追加
+  const handleBatchAddTrackTag = async (
+    tagName: string,
+    category = batchTrackTagCategory
+  ) => {
+    if (selectedTrackIds.size === 0 || !tagName.trim() || !activeAlbum) return;
+    try {
+      await invoke("add_tracks_tag", {
+        trackIds: Array.from(selectedTrackIds),
+        tagName: tagName.trim(),
+        category,
+      });
+      const updatedTracks = await invoke<Track[]>("get_album_tracks", {
+        albumId: activeAlbum.id,
+      });
+      setTracks(updatedTracks);
+      setBatchTrackTag("");
+      onTagsChanged?.();
+    } catch (err) {
+      console.error("Batch add track tag error", err);
+    }
+  };
+
+  // 複数曲からのタグ一括削除
+  const handleBatchRemoveTrackTag = async (tagName: string) => {
+    if (selectedTrackIds.size === 0 || !activeAlbum) return;
+    try {
+      await invoke("remove_tracks_tag", {
+        trackIds: Array.from(selectedTrackIds),
+        tagName,
+      });
+      const updatedTracks = await invoke<Track[]>("get_album_tracks", {
+        albumId: activeAlbum.id,
+      });
+      setTracks(updatedTracks);
+      onTagsChanged?.();
+    } catch (err) {
+      console.error("Batch remove track tag error", err);
+    }
+  };
+
+  // 選択された曲に含まれるタグの集計
+  const selectedTrackTagsSummary = useMemo(() => {
+    if (selectedTrackIds.size === 0) return [];
+    const countMap = new Map<string, number>();
+    const selected = sortedTracks.filter((t) => selectedTrackIds.has(t.id));
+    for (const t of selected) {
+      for (const tag of t.tags) {
+        countMap.set(tag, (countMap.get(tag) || 0) + 1);
+      }
+    }
+    return Array.from(countMap.entries())
+      .map(([name, count]) => ({
+        name,
+        count,
+        isAll: count === selectedTrackIds.size,
+      }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }, [sortedTracks, selectedTrackIds]);
+
+  // 一括タグ追加用サジェスト候補
+  const batchTagSuggestions = useMemo(() => {
+    if (selectedTrackIds.size === 0) return [];
+    const query = batchTrackTag.trim().toLowerCase();
+    const allSelectedHaveTag = new Set(
+      selectedTrackTagsSummary.filter((t) => t.isAll).map((t) => t.name)
+    );
+
+    const candidates = availableTags.filter(
+      (t) => !allSelectedHaveTag.has(t.name) && !/^\d{4}$/.test(t.name)
+    );
+
+    if (!query) {
+      return candidates.slice(0, 8);
+    }
+    return candidates
+      .filter((t) => t.name.toLowerCase().includes(query))
+      .slice(0, 10);
+  }, [selectedTrackIds, batchTrackTag, selectedTrackTagsSummary, availableTags]);
 
   const handleDeleteAlbum = async () => {
     if (!activeAlbum || isDeleting) return;
@@ -438,7 +602,13 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                 </div>
 
                 <button
-                  onClick={() => setActiveAlbum(null)}
+                  onClick={() => {
+                    setActiveAlbum(null);
+                    setSelectedTrackIds(new Set());
+                    setLastSelectedTrackIndex(null);
+                    setBatchTrackTag("");
+                    setEditingTrackId(null);
+                  }}
                   className="text-zinc-400 hover:text-zinc-100 p-1.5 rounded-lg hover:bg-zinc-800 transition cursor-pointer shrink-0"
                 >
                   <X className="h-5 w-5" />
@@ -487,200 +657,388 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
             <div className="flex-1 overflow-y-auto p-4">
               {loadingTracks ? (
                 <div className="py-12 text-center text-xs text-zinc-500">トラック読み込み中...</div>
-              ) : tracks.length === 0 ? (
+              ) : sortedTracks.length === 0 ? (
                 <div className="py-12 text-center text-xs text-zinc-500">トラック情報がありません</div>
               ) : (() => {
-                const sortedTracks = [...tracks].sort((a, b) => {
-                  const discA = a.disc_number ?? 1;
-                  const discB = b.disc_number ?? 1;
-                  if (discA !== discB) return discA - discB;
-                  const trackA = a.track_number ?? 9999;
-                  const trackB = b.track_number ?? 9999;
-                  if (trackA !== trackB) return trackA - trackB;
-                  return a.title.localeCompare(b.title);
-                });
-
                 const uniqueDiscs = Array.from(new Set(sortedTracks.map((t) => t.disc_number ?? 1)));
                 const hasMultipleDiscs = uniqueDiscs.length > 1;
 
                 return (
-                  <div className="flex flex-col divide-y divide-zinc-800/40">
-                    {sortedTracks.map((track, idx) => {
-                      const currentDisc = track.disc_number ?? 1;
-                      const prevDisc = idx > 0 ? (sortedTracks[idx - 1].disc_number ?? 1) : null;
-                      const showDiscHeader = hasMultipleDiscs && (idx === 0 || currentDisc !== prevDisc);
+                  <div className="flex flex-col gap-3">
+                    {/* Batch Selection & Editing Toolbar */}
+                    <div className="space-y-2">
+                      {/* Selection Toolbar Header */}
+                      <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-950/60 border border-zinc-800/80 text-xs">
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={handleToggleSelectAll}
+                            className="flex items-center gap-2 text-zinc-300 hover:text-white transition cursor-pointer select-none"
+                            title={
+                              selectedTrackIds.size === sortedTracks.length
+                                ? "全選択を解除"
+                                : "全曲を選択"
+                            }
+                          >
+                            {selectedTrackIds.size === sortedTracks.length && sortedTracks.length > 0 ? (
+                              <CheckSquare className="h-4 w-4 text-indigo-400" />
+                            ) : selectedTrackIds.size > 0 ? (
+                              <MinusSquare className="h-4 w-4 text-indigo-400" />
+                            ) : (
+                              <Square className="h-4 w-4 text-zinc-500 hover:text-zinc-400" />
+                            )}
+                            <span className="font-medium">
+                              {selectedTrackIds.size === sortedTracks.length && sortedTracks.length > 0
+                                ? "全選択解除"
+                                : "すべて選択"}
+                            </span>
+                          </button>
 
-                      return (
-                        <React.Fragment key={track.id}>
-                          {showDiscHeader && (
-                            <div className="flex items-center gap-2 pt-3.5 pb-1 px-3 text-[11px] font-semibold text-indigo-400 bg-zinc-900/80 border-b border-zinc-800/80 sticky top-0 backdrop-blur-sm z-10">
-                              <Disc3 className="h-3.5 w-3.5" />
-                              <span>Disc {currentDisc}</span>
+                          {selectedTrackIds.size > 0 && (
+                            <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-medium">
+                              {selectedTrackIds.size} / {sortedTracks.length} 曲選択中
+                            </span>
+                          )}
+                        </div>
+
+                        {selectedTrackIds.size > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTrackIds(new Set())}
+                            className="text-[11px] text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
+                          >
+                            選択解除
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Batch Tag Editing Panel */}
+                      {selectedTrackIds.size > 0 && (
+                        <div className="p-3.5 rounded-xl bg-zinc-950/90 border border-indigo-500/40 shadow-xl space-y-3 animate-in fade-in duration-150">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300">
+                              <Tag className="h-3.5 w-3.5" />
+                              <span>選択した {selectedTrackIds.size} 曲のタグを一括編集</span>
+                            </div>
+                            <span className="text-[10px] text-zinc-500 hidden sm:inline">
+                              Shift+クリックで曲の範囲選択が可能
+                            </span>
+                          </div>
+
+                          {/* Batch Tag Add Inputs */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={batchTrackTag}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setBatchTrackTag(val);
+                                const matched = availableTags.find(
+                                  (t) => t.name.toLowerCase() === val.trim().toLowerCase()
+                                );
+                                if (matched) {
+                                  setBatchTrackTagCategory(matched.category);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleBatchAddTrackTag(batchTrackTag);
+                                if (e.key === "Escape") setBatchTrackTag("");
+                              }}
+                              placeholder="タグ名を入力..."
+                              className="text-xs px-2.5 py-1 rounded-lg bg-zinc-900 border border-indigo-500/60 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-400 w-44"
+                            />
+                            <select
+                              value={batchTrackTagCategory}
+                              onChange={(e) => setBatchTrackTagCategory(e.target.value as TagCategory)}
+                              className="text-xs px-2 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-300 focus:outline-none"
+                              aria-label="一括追加タグの分類"
+                            >
+                              {tagCategories.map((category) => (
+                                <option key={category.value} value={category.value}>
+                                  {category.label}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              disabled={!batchTrackTag.trim()}
+                              onClick={() => handleBatchAddTrackTag(batchTrackTag)}
+                              className="text-xs px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-white font-medium transition cursor-pointer shadow-sm flex items-center gap-1"
+                            >
+                              <Plus className="h-3 w-3" />
+                              一括追加
+                            </button>
+                          </div>
+
+                          {/* Tag Suggestions for Batch */}
+                          {batchTagSuggestions.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1 text-[10px] text-zinc-400">
+                              <span className="text-zinc-500 text-[9px]">
+                                {batchTrackTag.trim() ? "候補:" : "よく使う候補:"}
+                              </span>
+                              {batchTagSuggestions.map((s) => (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  onClick={() => handleBatchAddTrackTag(s.name, s.category)}
+                                  className={`px-1.5 py-0.5 rounded border text-[9px] transition cursor-pointer hover:brightness-125 flex items-center gap-0.5 ${
+                                    tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
+                                  }`}
+                                  title={`選択中の ${selectedTrackIds.size} 曲に「${s.name}」を一括追加`}
+                                >
+                                  <span>+{s.name}</span>
+                                </button>
+                              ))}
                             </div>
                           )}
-                          <div
-                            className={`group py-2.5 px-3 flex items-center justify-between rounded-lg hover:bg-zinc-800/50 transition cursor-pointer text-xs ${currentPlayingTrackId === track.id ? "bg-indigo-950/25 border-l-2 border-indigo-500" : ""
-                              }`}
-                            onClick={() => {
-                              if (onPlayTrack) {
-                                onPlayTrack(track, activeAlbum);
-                              } else {
-                                onSelectTrack?.(track, activeAlbum);
-                              }
-                            }}
-                          >
-                            <div className="flex items-center gap-3 truncate">
-                              <span className="w-5 text-zinc-500 font-mono text-center text-[11px]">
-                                {track.track_number ?? "-"}
-                              </span>
-                              <div className="flex flex-col truncate">
-                                <div className="flex items-center gap-2 truncate">
-                                  <span className={`font-medium transition truncate ${currentPlayingTrackId === track.id
-                                      ? "text-indigo-400"
-                                      : "text-zinc-200 group-hover:text-indigo-300"
-                                    }`}>
-                                    {track.title}
-                                  </span>
-                                  {currentPlayingTrackId === track.id && isPlaying && (
-                                    <Volume2 className="h-3.5 w-3.5 text-indigo-400 shrink-0 animate-pulse" />
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 text-[10px] text-zinc-500 truncate">
-                                  {track.artist && <span>{track.artist}</span>}
-                                  {track.composer && <span>(作: {track.composer})</span>}
-                                </div>
+
+                          {/* Existing Tags in Selected Tracks (with batch remove) */}
+                          {selectedTrackTagsSummary.length > 0 && (
+                            <div className="pt-2 border-t border-zinc-800/80">
+                              <div className="text-[10px] text-zinc-400 mb-1.5 flex items-center gap-1">
+                                <span>選択曲に付いているタグ (×で選択曲から一括削除):</span>
                               </div>
-                            </div>
-
-                            <div className="flex items-center gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              {/* Track tags list */}
-                              <div className="flex items-center gap-1">
-                                {track.tags.map((t, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center gap-0.5 text-[9px] pl-1.5 pr-1 py-0.2 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
-                                  >
-                                    {t}
-                                    <button
-                                      onClick={() => handleRemoveTrackTag(track.id, t)}
-                                      className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer"
-                                      title="タグを削除"
+                              <div className="flex flex-wrap gap-1.5">
+                                {selectedTrackTagsSummary.map((item) => {
+                                  const category = getTagCategory(item.name);
+                                  return (
+                                    <span
+                                      key={item.name}
+                                      className={`inline-flex items-center gap-1 text-[10px] pl-2 pr-1.5 py-0.5 rounded-full border ${tagColorClasses[category]}`}
                                     >
-                                      <X className="h-2 w-2" />
-                                    </button>
-                                  </span>
-                                ))}
-
-                                {/* Add Track Tag input / button */}
-                                {editingTrackId === track.id ? (
-                                  <div className="flex flex-col items-start gap-1">
-                                    <div className="flex items-center gap-1">
-                                      <input
-                                        type="text"
-                                        value={newTrackTag}
-                                        onChange={(e) => {
-                                          const val = e.target.value;
-                                          setNewTrackTag(val);
-                                          const matched = availableTags.find(
-                                            (t) => t.name.toLowerCase() === val.trim().toLowerCase()
-                                          );
-                                          if (matched) {
-                                            setNewTrackTagCategory(matched.category);
-                                          }
-                                        }}
-                                        onKeyDown={(e) => {
-                                          if (e.key === "Enter") handleAddTrackTag(track.id, newTrackTag);
-                                          if (e.key === "Escape") setEditingTrackId(null);
-                                        }}
-                                        placeholder="曲タグ..."
-                                        autoFocus
-                                        className="text-[9px] px-1.5 py-0.2 rounded bg-zinc-950 border border-emerald-500/60 text-zinc-100 w-16 focus:outline-none"
-                                      />
-                                      <select
-                                        value={newTrackTagCategory}
-                                        onChange={(e) => setNewTrackTagCategory(e.target.value as TagCategory)}
-                                        className="text-[9px] px-1 py-0.2 rounded bg-zinc-950 border border-zinc-700 text-zinc-300 focus:outline-none"
-                                        aria-label="曲タグの分類"
-                                      >
-                                        {tagCategories.map((category) => (
-                                          <option key={category.value} value={category.value}>{category.label}</option>
-                                        ))}
-                                      </select>
+                                      <span>#{item.name}</span>
+                                      <span className="text-[9px] opacity-70 font-mono">
+                                        ({item.count}/{selectedTrackIds.size})
+                                      </span>
                                       <button
-                                        onClick={() => handleAddTrackTag(track.id, newTrackTag)}
-                                        className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-600 text-white hover:bg-emerald-500 cursor-pointer"
-                                      >
-                                        追加
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          setEditingTrackId(null);
-                                          setNewTrackTag("");
-                                        }}
-                                        className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                                        type="button"
+                                        onClick={() => handleBatchRemoveTrackTag(item.name)}
+                                        className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer ml-0.5"
+                                        title={`選択したすべての曲から「${item.name}」を一括削除`}
                                       >
                                         <X className="h-2.5 w-2.5" />
                                       </button>
-                                    </div>
-                                    {trackTagSuggestions.length > 0 && (
-                                      <div className="flex flex-wrap items-center gap-1 mt-0.5 text-[8px] text-zinc-500">
-                                        <span>候補:</span>
-                                        {trackTagSuggestions.map((s) => (
-                                          <button
-                                            key={s.id}
-                                            onClick={() => handleAddTrackTag(track.id, s.name, s.category)}
-                                            className={`px-1 py-0.2 rounded border text-[8px] transition cursor-pointer hover:brightness-125 ${
-                                              tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
-                                            }`}
-                                            title={`タグ「${s.name}」(${tagCategories.find(c => c.value === s.category)?.label || s.category}) を追加`}
-                                          >
-                                            +{s.name}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() => {
-                                      setEditingTrackId(track.id);
-                                      setNewTrackTag("");
-                                      setNewTrackTagCategory("other");
-                                    }}
-                                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-zinc-700 text-zinc-500 hover:text-zinc-300 transition cursor-pointer"
-                                    title="曲にタグを追加"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </button>
-                                )}
-                              </div>
-
-                              <div className="flex items-center gap-2 shrink-0">
-                                {/* Queue Button */}
-                                {onQueueTrack && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onQueueTrack(track, activeAlbum);
-                                    }}
-                                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-800 hover:bg-indigo-600 text-zinc-300 hover:text-white border border-zinc-700/40 hover:border-indigo-500 text-[10px] transition cursor-pointer"
-                                    title="この曲を再生キューに追加"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                    <span>キューへ</span>
-                                  </button>
-                                )}
-
-                                <span className="text-[11px] text-zinc-500 font-mono flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  {formatDuration(track.duration_secs)}
-                                </span>
+                                    </span>
+                                  );
+                                })}
                               </div>
                             </div>
-                          </div>
-                        </React.Fragment>
-                      );
-                    })}
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Tracks List Items */}
+                    <div className="flex flex-col divide-y divide-zinc-800/40">
+                      {sortedTracks.map((track, idx) => {
+                        const currentDisc = track.disc_number ?? 1;
+                        const prevDisc = idx > 0 ? (sortedTracks[idx - 1].disc_number ?? 1) : null;
+                        const showDiscHeader = hasMultipleDiscs && (idx === 0 || currentDisc !== prevDisc);
+                        const isSelected = selectedTrackIds.has(track.id);
+
+                        return (
+                          <React.Fragment key={track.id}>
+                            {showDiscHeader && (
+                              <div className="flex items-center gap-2 pt-3.5 pb-1 px-3 text-[11px] font-semibold text-indigo-400 bg-zinc-900/80 border-b border-zinc-800/80 sticky top-0 backdrop-blur-sm z-10">
+                                <Disc3 className="h-3.5 w-3.5" />
+                                <span>Disc {currentDisc}</span>
+                              </div>
+                            )}
+                            <div
+                              className={`group py-2.5 px-3 flex items-center justify-between rounded-lg hover:bg-zinc-800/50 transition cursor-pointer text-xs ${
+                                isSelected
+                                  ? "bg-indigo-950/40 border-l-2 border-indigo-500"
+                                  : currentPlayingTrackId === track.id
+                                  ? "bg-indigo-950/25 border-l-2 border-indigo-400"
+                                  : ""
+                              }`}
+                              onClick={() => {
+                                if (onPlayTrack) {
+                                  onPlayTrack(track, activeAlbum);
+                                } else {
+                                  onSelectTrack?.(track, activeAlbum);
+                                }
+                              }}
+                            >
+                              <div className="flex items-center gap-2.5 truncate">
+                                {/* Track Selection Checkbox */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleToggleTrackSelect(track.id, idx, e)}
+                                  className="p-1 -ml-1 text-zinc-500 hover:text-zinc-200 transition cursor-pointer shrink-0"
+                                  title="選択 / 選択解除 (Shift+クリックで範囲選択)"
+                                >
+                                  {isSelected ? (
+                                    <CheckSquare className="h-4 w-4 text-indigo-400" />
+                                  ) : (
+                                    <Square className="h-4 w-4 text-zinc-600 group-hover:text-zinc-400" />
+                                  )}
+                                </button>
+
+                                <span className="w-5 text-zinc-500 font-mono text-center text-[11px] shrink-0">
+                                  {track.track_number ?? "-"}
+                                </span>
+                                <div className="flex flex-col truncate">
+                                  <div className="flex items-center gap-2 truncate">
+                                    <span
+                                      className={`font-medium transition truncate ${
+                                        currentPlayingTrackId === track.id
+                                          ? "text-indigo-400"
+                                          : isSelected
+                                          ? "text-indigo-200 font-semibold"
+                                          : "text-zinc-200 group-hover:text-indigo-300"
+                                      }`}
+                                    >
+                                      {track.title}
+                                    </span>
+                                    {currentPlayingTrackId === track.id && isPlaying && (
+                                      <Volume2 className="h-3.5 w-3.5 text-indigo-400 shrink-0 animate-pulse" />
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-[10px] text-zinc-500 truncate">
+                                    {track.artist && <span>{track.artist}</span>}
+                                    {track.composer && <span>(作: {track.composer})</span>}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                {/* Track tags list */}
+                                <div className="flex items-center gap-1">
+                                  {track.tags.map((t, tagIdx) => {
+                                    const category = getTagCategory(t);
+                                    return (
+                                      <span
+                                        key={tagIdx}
+                                        className={`inline-flex items-center gap-0.5 text-[9px] pl-1.5 pr-1 py-0.2 rounded border ${tagColorClasses[category]}`}
+                                      >
+                                        {t}
+                                        <button
+                                          onClick={() => handleRemoveTrackTag(track.id, t)}
+                                          className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer"
+                                          title="タグを削除"
+                                        >
+                                          <X className="h-2 w-2" />
+                                        </button>
+                                      </span>
+                                    );
+                                  })}
+
+                                  {/* Add Track Tag input / button */}
+                                  {editingTrackId === track.id ? (
+                                    <div className="flex flex-col items-start gap-1">
+                                      <div className="flex items-center gap-1">
+                                        <input
+                                          type="text"
+                                          value={newTrackTag}
+                                          onChange={(e) => {
+                                            const val = e.target.value;
+                                            setNewTrackTag(val);
+                                            const matched = availableTags.find(
+                                              (t) => t.name.toLowerCase() === val.trim().toLowerCase()
+                                            );
+                                            if (matched) {
+                                              setNewTrackTagCategory(matched.category);
+                                            }
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === "Enter") handleAddTrackTag(track.id, newTrackTag);
+                                            if (e.key === "Escape") setEditingTrackId(null);
+                                          }}
+                                          placeholder="曲タグ..."
+                                          autoFocus
+                                          className="text-[9px] px-1.5 py-0.2 rounded bg-zinc-950 border border-emerald-500/60 text-zinc-100 w-16 focus:outline-none"
+                                        />
+                                        <select
+                                          value={newTrackTagCategory}
+                                          onChange={(e) => setNewTrackTagCategory(e.target.value as TagCategory)}
+                                          className="text-[9px] px-1 py-0.2 rounded bg-zinc-950 border border-zinc-700 text-zinc-300 focus:outline-none"
+                                          aria-label="曲タグの分類"
+                                        >
+                                          {tagCategories.map((category) => (
+                                            <option key={category.value} value={category.value}>
+                                              {category.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <button
+                                          onClick={() => handleAddTrackTag(track.id, newTrackTag)}
+                                          className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-600 text-white hover:bg-emerald-500 cursor-pointer"
+                                        >
+                                          追加
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setEditingTrackId(null);
+                                            setNewTrackTag("");
+                                          }}
+                                          className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                                        >
+                                          <X className="h-2.5 w-2.5" />
+                                        </button>
+                                      </div>
+                                      {trackTagSuggestions.length > 0 && (
+                                        <div className="flex flex-wrap items-center gap-1 mt-0.5 text-[8px] text-zinc-500">
+                                          <span>候補:</span>
+                                          {trackTagSuggestions.map((s) => (
+                                            <button
+                                              key={s.id}
+                                              onClick={() => handleAddTrackTag(track.id, s.name, s.category)}
+                                              className={`px-1 py-0.2 rounded border text-[8px] transition cursor-pointer hover:brightness-125 ${
+                                                tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
+                                              }`}
+                                              title={`タグ「${s.name}」(${
+                                                tagCategories.find((c) => c.value === s.category)?.label || s.category
+                                              }) を追加`}
+                                            >
+                                              +{s.name}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        setEditingTrackId(track.id);
+                                        setNewTrackTag("");
+                                        setNewTrackTagCategory("other");
+                                      }}
+                                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-zinc-700 text-zinc-500 hover:text-zinc-300 transition cursor-pointer"
+                                      title="曲にタグを追加"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {/* Queue Button */}
+                                  {onQueueTrack && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onQueueTrack(track, activeAlbum);
+                                      }}
+                                      className="flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-800 hover:bg-indigo-600 text-zinc-300 hover:text-white border border-zinc-700/40 hover:border-indigo-500 text-[10px] transition cursor-pointer"
+                                      title="この曲を再生キューに追加"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                      <span>キューへ</span>
+                                    </button>
+                                  )}
+
+                                  <span className="text-[11px] text-zinc-500 font-mono flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {formatDuration(track.duration_secs)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })()}

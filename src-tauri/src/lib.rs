@@ -208,6 +208,29 @@ async fn remove_track_tag(
 }
 
 #[tauri::command]
+async fn add_tracks_tag(
+    app_handle: tauri::AppHandle,
+    track_ids: Vec<i64>,
+    tag_name: String,
+    category: String,
+) -> Result<(), String> {
+    let db_path = get_db_path(&app_handle)?;
+    let mut conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+    db::add_tracks_tag(&mut conn, &track_ids, &tag_name, &category).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn remove_tracks_tag(
+    app_handle: tauri::AppHandle,
+    track_ids: Vec<i64>,
+    tag_name: String,
+) -> Result<(), String> {
+    let db_path = get_db_path(&app_handle)?;
+    let mut conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+    db::remove_tracks_tag(&mut conn, &track_ids, &tag_name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn delete_album(
     app_handle: tauri::AppHandle,
     album_id: i64,
@@ -245,6 +268,8 @@ pub fn run() {
             remove_album_tag,
             add_track_tag,
             remove_track_tag,
+            add_tracks_tag,
+            remove_tracks_tag,
             delete_album,
         ])
         .run(tauri::generate_context!())
