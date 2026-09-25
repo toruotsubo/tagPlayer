@@ -249,6 +249,64 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .setup(|app| {
+            #[cfg(target_os = "windows")]
+            {
+                use std::ffi::c_void;
+
+                #[link(name = "dwmapi")]
+                extern "system" {
+                    fn DwmSetWindowAttribute(
+                        hwnd: *mut c_void,
+                        dwAttribute: u32,
+                        pvAttribute: *const c_void,
+                        cbAttribute: u32,
+                    ) -> i32;
+                }
+
+                if let Some(window) = app.get_webview_window("main") {
+                    if let Ok(hwnd) = window.hwnd() {
+                        let hwnd_ptr = hwnd.0 as *mut c_void;
+
+                        // DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+                        let dark_mode: i32 = 1;
+                        unsafe {
+                            DwmSetWindowAttribute(
+                                hwnd_ptr,
+                                20,
+                                &dark_mode as *const _ as *const c_void,
+                                std::mem::size_of::<i32>() as u32,
+                            );
+                        }
+
+                        // DWMWA_CAPTION_COLOR = 35 (Windows 11: 0x00BBGGRR)
+                        // #18181b -> R=0x18, G=0x18, B=0x1b -> 0x001b1818
+                        let caption_color: u32 = 0x001b1818;
+                        unsafe {
+                            DwmSetWindowAttribute(
+                                hwnd_ptr,
+                                35,
+                                &caption_color as *const _ as *const c_void,
+                                std::mem::size_of::<u32>() as u32,
+                            );
+                        }
+
+                        // DWMWA_TEXT_COLOR = 36 (Windows 11: 0x00BBGGRR)
+                        // #e4e4e7 -> R=0xe4, G=0xe4, B=0xe7 -> 0x00e7e4e4
+                        let text_color: u32 = 0x00e7e4e4;
+                        unsafe {
+                            DwmSetWindowAttribute(
+                                hwnd_ptr,
+                                36,
+                                &text_color as *const _ as *const c_void,
+                                std::mem::size_of::<u32>() as u32,
+                            );
+                        }
+                    }
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             scan_music_directory,
             get_library_data,

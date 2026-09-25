@@ -600,9 +600,7 @@ function App() {
       {/* Top Header */}
       <header className="flex h-12 items-center justify-between border-b border-zinc-800/80 px-4 bg-zinc-900/50 backdrop-blur z-20">
         <div className="flex items-center gap-2">
-          <Disc3 className={`h-5 w-5 text-indigo-400 ${isPlaying ? "animate-spin-slow" : ""}`} />
-          <span className="font-semibold tracking-wider text-sm text-zinc-200">tagPlayer</span>
-          <span className="text-[11px] text-zinc-500 ml-3">
+          <span className="text-xs text-zinc-400 font-mono">
             {library.albums.length} アルバム / {library.total_tracks} トラック
           </span>
         </div>

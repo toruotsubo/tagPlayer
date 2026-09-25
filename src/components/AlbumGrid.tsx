@@ -2,7 +2,6 @@ import React, { useState, useMemo } from "react";
 import {
   Disc3,
   Music,
-  Calendar,
   Clock,
   X,
   Tag,
@@ -438,26 +437,20 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                   {album.artist}
                 </span>
 
-                <div className="flex items-center gap-2 text-[10px] text-zinc-500 mt-1">
-                  {album.release_year && (
-                    <span className="flex items-center gap-0.5">
-                      <Calendar className="h-2.5 w-2.5" /> {album.release_year}
-                    </span>
-                  )}
-                  <span>{album.track_count} 曲</span>
-                </div>
-
                 {/* Tags preview */}
                 {album.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {album.tags.slice(0, 3).map((tag, idx) => (
-                      <span
-                        key={idx}
-                        className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400 border border-zinc-700/40 font-mono truncate max-w-[80px]"
-                      >
-                        #{tag}
-                      </span>
-                    ))}
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {album.tags.slice(0, 3).map((tag, idx) => {
+                      const category = getTagCategory(tag);
+                      return (
+                        <span
+                          key={idx}
+                          className={`text-[9px] px-1.5 py-0.5 rounded border font-mono truncate max-w-[80px] ${tagColorClasses[category]}`}
+                        >
+                          #{tag}
+                        </span>
+                      );
+                    })}
                     {album.tags.length > 3 && (
                       <span className="text-[9px] text-zinc-500">
                         +{album.tags.length - 3}
@@ -492,9 +485,6 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                     )}
                   </div>
                   <div className="flex flex-col justify-center min-w-0 flex-1">
-                    <span className="text-xs uppercase tracking-wider text-indigo-400 font-semibold">
-                      Album
-                    </span>
                     <h2 className="text-lg font-bold text-zinc-100 truncate">{activeAlbum.title}</h2>
                     <p className="text-xs text-zinc-400 mt-0.5 truncate">{activeAlbum.artist}</p>
 
