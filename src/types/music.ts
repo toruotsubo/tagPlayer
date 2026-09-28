@@ -1,4 +1,4 @@
-export type TagCategory = "genre" | "artist" | "release_year" | "other";
+export type TagCategory = "genre" | "artist" | "composer" | "release_year" | "other";
 
 export interface TagItem {
   id: number;

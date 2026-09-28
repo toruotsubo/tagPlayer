@@ -30,6 +30,7 @@ interface TrackListProps {
 const tagCategories: { value: TagCategory; label: string }[] = [
   { value: "genre", label: "ジャンル" },
   { value: "artist", label: "アーティスト" },
+  { value: "composer", label: "作曲" },
   { value: "release_year", label: "リリース年" },
   { value: "other", label: "その他" },
 ];
@@ -37,6 +38,7 @@ const tagCategories: { value: TagCategory; label: string }[] = [
 const tagColorClasses: Record<TagCategory, string> = {
   genre: "bg-amber-500/10 text-amber-300 border-amber-500/30",
   artist: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  composer: "bg-purple-500/10 text-purple-300 border-purple-500/30",
   release_year: "bg-sky-500/10 text-sky-300 border-sky-500/30",
   other: "bg-indigo-500/10 text-indigo-300 border-indigo-500/30",
 };

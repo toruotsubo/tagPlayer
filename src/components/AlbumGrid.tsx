@@ -36,6 +36,7 @@ interface AlbumGridProps {
 const tagCategories: { value: TagCategory; label: string }[] = [
   { value: "genre", label: "ジャンル" },
   { value: "artist", label: "アーティスト" },
+  { value: "composer", label: "作曲" },
   { value: "release_year", label: "リリース年" },
   { value: "other", label: "その他" },
 ];
@@ -43,6 +44,7 @@ const tagCategories: { value: TagCategory; label: string }[] = [
 const tagColorClasses: Record<TagCategory, string> = {
   genre: "bg-amber-500/10 text-amber-300 border-amber-500/30",
   artist: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  composer: "bg-purple-500/10 text-purple-300 border-purple-500/30",
   release_year: "bg-sky-500/10 text-sky-300 border-sky-500/30",
   other: "bg-indigo-500/10 text-indigo-300 border-indigo-500/30",
 };
@@ -466,8 +468,8 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
 
       {/* Album Tracks Detail Modal */}
       {activeAlbum && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8 animate-in fade-in duration-150">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-[95vw] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden select-text">
             {/* Modal Header */}
             <div className="p-6 border-b border-zinc-800/80 flex flex-col gap-4 bg-zinc-900/90">
               {/* Top Row: Album Info & Close Button */}
@@ -493,12 +495,12 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                       {activeAlbum.tags.map((t, i) => (
                         <span
                           key={i}
-                          className={`group/tag inline-flex items-center gap-1 text-[10px] pl-2 pr-1.5 py-0.5 rounded-full border ${tagColorClasses[getTagCategory(t)]}`}
+                          className={`group/tag inline-flex items-center gap-1 text-[10px] pl-2 pr-1.5 py-0.5 rounded-full border select-text cursor-text ${tagColorClasses[getTagCategory(t)]}`}
                         >
-                          #{t}
+                          <span className="select-text cursor-text">#{t}</span>
                           <button
                             onClick={() => handleRemoveAlbumTag(t)}
-                            className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer"
+                            className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none"
                             title="タグを削除"
                           >
                             <X className="h-2.5 w-2.5" />
@@ -794,16 +796,16 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                                   return (
                                     <span
                                       key={item.name}
-                                      className={`inline-flex items-center gap-1 text-[10px] pl-2 pr-1.5 py-0.5 rounded-full border ${tagColorClasses[category]}`}
+                                      className={`inline-flex items-center gap-1 text-[10px] pl-2 pr-1.5 py-0.5 rounded-full border select-text cursor-text ${tagColorClasses[category]}`}
                                     >
-                                      <span>#{item.name}</span>
-                                      <span className="text-[9px] opacity-70 font-mono">
+                                      <span className="select-text cursor-text">#{item.name}</span>
+                                      <span className="text-[9px] opacity-70 font-mono select-none">
                                         ({item.count}/{selectedTrackIds.size})
                                       </span>
                                       <button
                                         type="button"
                                         onClick={() => handleBatchRemoveTrackTag(item.name)}
-                                        className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer ml-0.5"
+                                        className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer ml-0.5 select-none"
                                         title={`選択したすべての曲から「${item.name}」を一括削除`}
                                       >
                                         <X className="h-2.5 w-2.5" />
@@ -892,7 +894,11 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <div
+                                className="flex items-center gap-3 shrink-0"
+                                onClick={(e) => e.stopPropagation()}
+                                onMouseDown={(e) => e.stopPropagation()}
+                              >
                                 {/* Track tags list */}
                                 <div className="flex items-center gap-1">
                                   {track.tags.map((t, tagIdx) => {
@@ -900,12 +906,12 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                                     return (
                                       <span
                                         key={tagIdx}
-                                        className={`inline-flex items-center gap-0.5 text-[9px] pl-1.5 pr-1 py-0.2 rounded border ${tagColorClasses[category]}`}
+                                        className={`inline-flex items-center gap-0.5 text-[9px] pl-1.5 pr-1 py-0.2 rounded border select-text cursor-text ${tagColorClasses[category]}`}
                                       >
-                                        {t}
+                                        <span className="select-text cursor-text">{t}</span>
                                         <button
                                           onClick={() => handleRemoveTrackTag(track.id, t)}
-                                          className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer"
+                                          className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none"
                                           title="タグを削除"
                                         >
                                           <X className="h-2 w-2" />

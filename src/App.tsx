@@ -104,11 +104,10 @@ function App() {
     }
   };
 
-  // タグ選択変更時のトラック取得 & ビュー自動切り替え
+  // タグ選択変更時のトラック取得
   useEffect(() => {
     if (selectedTags.length > 0) {
       loadTagTracks(selectedTags, matchAll);
-      setViewMode("tracks");
     } else {
       if (viewMode === "tracks") {
         loadTagTracks([], matchAll);

@@ -15,7 +15,7 @@ pub struct TagItem {
     pub name: String,
     pub count: i64,
     pub target_type: String, // "album" または "track"
-    pub category: String,    // "genre", "artist", "release_year", "other"
+    pub category: String,    // "genre", "artist", "composer", "release_year", "other"
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

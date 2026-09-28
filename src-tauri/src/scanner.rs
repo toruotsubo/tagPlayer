@@ -951,6 +951,8 @@ pub fn scan_and_save_directory(
             for tt in track_tags {
                 let category = if track_meta.track_artist.as_deref() == Some(tt.as_str()) {
                     "artist"
+                } else if track_meta.composer.as_deref() == Some(tt.as_str()) {
+                    "composer"
                 } else {
                     "other"
                 };

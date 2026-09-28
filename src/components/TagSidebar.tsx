@@ -7,6 +7,7 @@ import {
   ListMusic,
   Trash2,
   SlidersHorizontal,
+  X,
 } from "lucide-react";
 import { Playlist, TagCategory, TagItem } from "../types/music";
 
@@ -45,6 +46,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
     all: "全種",
     genre: "ジャンル",
     artist: "アーティスト",
+    composer: "作曲",
     release_year: "リリース年",
     other: "その他",
   };
@@ -52,6 +54,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
   const categoryDotClasses: Record<TagCategory, string> = {
     genre: "bg-amber-400",
     artist: "bg-emerald-400",
+    composer: "bg-purple-400",
     release_year: "bg-sky-400",
     other: "bg-indigo-400",
   };
@@ -104,6 +107,35 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
                 </button>
               </div>
 
+              {/* 選択中のタグリスト */}
+              <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto py-0.5 pr-0.5">
+                {selectedTags.map((tagName) => {
+                  const tagItem = tags.find((t) => t.name === tagName);
+                  const category = tagItem?.category || "other";
+                  return (
+                    <span
+                      key={tagName}
+                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-900/80 border border-zinc-700/60 text-xs text-zinc-200"
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full shrink-0 ${categoryDotClasses[category]}`}
+                      />
+                      <span className="truncate max-w-[120px]" title={tagName}>
+                        {tagName}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onToggleTag(tagName)}
+                        className="text-zinc-400 hover:text-red-400 p-0.5 -mr-0.5 rounded transition cursor-pointer"
+                        title={`${tagName} を解除`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+
               <div className="flex items-center justify-between text-[11px] text-zinc-400">
                 <span className="flex items-center gap-1">
                   <SlidersHorizontal className="h-3 w-3" /> 条件:
@@ -127,20 +159,30 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
           )}
 
           {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-500" />
+          <div className="relative flex items-center">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="タグを検索..."
-              className="w-full rounded-lg bg-zinc-950/60 border border-zinc-800/80 pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none transition"
+              className="w-full rounded-lg bg-zinc-950/60 border border-zinc-800/80 pl-8 pr-8 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none transition"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 p-0.5 rounded hover:bg-zinc-800/60 transition cursor-pointer"
+                title="検索ワードをクリア"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Tag categories */}
           <div className="flex flex-wrap gap-1 text-[11px]">
-            {(["all", "genre", "artist", "release_year", "other"] as const).map((cat) => (
+            {(["all", "genre", "artist", "composer", "release_year", "other"] as const).map((cat) => (
               <button
                 key={cat}
                 onClick={() => setTagCategory(cat)}
@@ -193,7 +235,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
 
           {/* Footer Legend */}
           <div className="pt-2 border-t border-zinc-800/60 grid grid-cols-2 gap-y-1 text-[10px] text-zinc-500">
-            {(Object.keys(categoryDotClasses) as TagCategory[]).map((category) => (
+            {(["genre", "artist", "composer", "release_year", "other"] as TagCategory[]).map((category) => (
               <span key={category} className="flex items-center gap-1">
                 <span className={`h-1.5 w-1.5 rounded-full ${categoryDotClasses[category]}`} />
                 {categoryLabels[category]}

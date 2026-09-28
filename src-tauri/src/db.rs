@@ -78,6 +78,15 @@ pub fn init_db(conn: &Connection) -> Result<()> {
 
     let _ = fix_missing_disc_numbers(conn);
 
+    // 作曲者タグのカテゴリを更新（既存の tags で tracks.composer に一致するものを composer に）
+    let _ = conn.execute(
+        "UPDATE tags SET category = 'composer'
+         WHERE category = 'other' AND name IN (
+             SELECT DISTINCT composer FROM tracks WHERE composer IS NOT NULL AND composer != ''
+         )",
+        [],
+    );
+
     Ok(())
 }
 
@@ -122,7 +131,7 @@ pub fn get_or_create_tag_with_category(
         return Ok(0);
     }
     let normalized_category = match category {
-        "genre" | "artist" | "release_year" => category,
+        "genre" | "artist" | "composer" | "release_year" => category,
         _ => "other",
     };
     conn.execute(
