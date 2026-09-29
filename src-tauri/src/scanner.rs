@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::probe::Probe;
@@ -27,73 +27,104 @@ pub fn find_folder_cover(dir: &Path) -> Option<(Vec<u8>, Option<String>)> {
         return None;
     }
 
-    let candidates = [
-        "folder.jpg",
-        "folder.jpeg",
-        "folder.png",
-        "cover.jpg",
-        "cover.jpeg",
-        "cover.png",
-        "albumartsmall.jpg",
-    ];
+    let entries = fs::read_dir(dir).ok()?;
+    let mut image_files: Vec<(PathBuf, u64)> = Vec::new();
 
-    if let Ok(entries) = fs::read_dir(dir) {
-        let mut all_files = Vec::new();
-        for entry in entries.flatten() {
-            if let Ok(ft) = entry.file_type() {
-                if ft.is_file() {
-                    all_files.push(entry.path());
+    for entry in entries.flatten() {
+        if let Ok(ft) = entry.file_type() {
+            if ft.is_file() {
+                let path = entry.path();
+                let is_img = path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(|e| {
+                        let lower = e.to_ascii_lowercase();
+                        lower == "jpg" || lower == "jpeg" || lower == "png" || lower == "webp"
+                    })
+                    .unwrap_or(false);
+
+                if is_img {
+                    let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                    image_files.push((path, size));
                 }
             }
         }
+    }
 
-        // 1. Check exact candidate names (case-insensitive)
-        for cand in candidates {
-            if let Some(found) = all_files.iter().find(|p| {
-                p.file_name()
-                    .and_then(|f| f.to_str())
-                    .map(|s| s.eq_ignore_ascii_case(cand))
-                    .unwrap_or(false)
-            }) {
-                if let Ok(data) = fs::read(found) {
-                    let mime = if found.extension().map(|e| e.eq_ignore_ascii_case("png")).unwrap_or(false) {
-                        Some("image/png".to_string())
-                    } else {
-                        Some("image/jpeg".to_string())
-                    };
-                    return Some((data, mime));
-                }
-            }
+    if image_files.is_empty() {
+        return None;
+    }
+
+    // Windows Media Player 等が生成する 1KB〜2KB 程度のダミー・プレースホルダー画像（真っ黒な Folder.jpg など）を判定
+    let has_larger_images = image_files.iter().any(|(_, size)| *size > 2048);
+
+    fn calculate_score(path: &Path, size: u64, has_larger_images: bool) -> (i32, u64) {
+        let name = path
+            .file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+
+        // 2KB以下の画像で、他に大きな画像がある場合はダミー/破損画像の可能性が極めて高いため優先度を最低に
+        if size <= 2048 && has_larger_images {
+            return (-100, size);
         }
 
-        // 2. Check AlbumArt*Large.jpg or AlbumArt*.jpg
-        if let Some(found) = all_files.iter().find(|p| {
-            p.file_name()
-                .and_then(|f| f.to_str())
-                .map(|s| {
-                    let lower = s.to_ascii_lowercase();
-                    lower.starts_with("albumart") && (lower.ends_with(".jpg") || lower.ends_with(".png") || lower.ends_with(".jpeg"))
-                })
-                .unwrap_or(false)
-        }) {
-            if let Ok(data) = fs::read(found) {
-                return Some((data, Some("image/jpeg".to_string())));
+        let base_score = if name == "cover.jpg" || name == "cover.png" || name == "cover.jpeg" {
+            100
+        } else if name == "folder.jpg" || name == "folder.png" || name == "folder.jpeg" {
+            // folder.jpg でも 2KB 以下なら低スコア、10KB超の正常な画像なら高スコア
+            if size > 10240 {
+                95
+            } else if size > 2048 {
+                80
+            } else {
+                -50
             }
-        }
+        } else if name.starts_with("albumart")
+            && (name.ends_with("large.jpg")
+                || name.ends_with("large.jpeg")
+                || name.ends_with("large.png"))
+        {
+            90
+        } else if name.starts_with("front") {
+            85
+        } else if name.starts_with("albumart") && !name.contains("small") {
+            70
+        } else if name.contains("small") {
+            30
+        } else {
+            50
+        };
 
-        // 3. Any image in directory
-        if let Some(found) = all_files.iter().find(|p| {
-            p.extension()
-                .and_then(|e| e.to_str())
-                .map(|e| {
-                    let lower = e.to_ascii_lowercase();
-                    lower == "jpg" || lower == "jpeg" || lower == "png"
-                })
+        (base_score, size)
+    }
+
+    // スコア降順（スコアが同じならファイルサイズが大きい順＝高画質優先）でソート
+    image_files.sort_by(|(p1, s1), (p2, s2)| {
+        let score1 = calculate_score(p1, *s1, has_larger_images);
+        let score2 = calculate_score(p2, *s2, has_larger_images);
+        score2.cmp(&score1)
+    });
+
+    for (best_path, _) in image_files {
+        if let Ok(data) = fs::read(&best_path) {
+            let mime = if best_path
+                .extension()
+                .map(|e| e.eq_ignore_ascii_case("png"))
                 .unwrap_or(false)
-        }) {
-            if let Ok(data) = fs::read(found) {
-                return Some((data, Some("image/jpeg".to_string())));
-            }
+            {
+                Some("image/png".to_string())
+            } else if best_path
+                .extension()
+                .map(|e| e.eq_ignore_ascii_case("webp"))
+                .unwrap_or(false)
+            {
+                Some("image/webp".to_string())
+            } else {
+                Some("image/jpeg".to_string())
+            };
+            return Some((data, mime));
         }
     }
 
@@ -759,7 +790,15 @@ pub fn save_cover_art(
     let filename = format!("cover_{}.{}", &hash[..16], ext);
     let target_path = cache_dir.join(&filename);
 
-    if !target_path.exists() {
+    let should_write = if target_path.exists() {
+        let existing_size = fs::metadata(&target_path).map(|m| m.len()).unwrap_or(0);
+        // 既存キャッシュが2KB以下のダミー画像で、新しいデータが2KB超の場合、上書き更新する
+        existing_size <= 2048 && data.len() > 2048
+    } else {
+        true
+    };
+
+    if should_write {
         let _ = fs::create_dir_all(cache_dir);
         if fs::write(&target_path, data).is_err() {
             return None;
@@ -844,7 +883,18 @@ pub fn scan_and_save_directory(
         let cover_data = group.cover_data.or_else(|| {
             if let Some(first_track) = group.tracks.first() {
                 let track_path = Path::new(&first_track.file_path);
-                track_path.parent().and_then(find_folder_cover)
+                let parent = track_path.parent();
+                // 1. トラックが存在するフォルダ (例: .../Album/ または .../Album/Disc 1/)
+                if let Some(c) = parent.and_then(find_folder_cover) {
+                    return Some(c);
+                }
+                // 2. 親フォルダ (例: .../Album/Disc 1/ の場合の .../Album/)
+                if let Some(grandparent) = parent.and_then(|p| p.parent()) {
+                    if let Some(c) = find_folder_cover(grandparent) {
+                        return Some(c);
+                    }
+                }
+                None
             } else {
                 None
             }
@@ -1094,6 +1144,20 @@ mod tests {
 
             assert!(track_tags.contains(&"Isabelle Faust, Alexander Melnikov".to_string()));
             assert!(track_tags.contains(&"Claude Debussy".to_string()));
+        }
+    }
+
+    #[test]
+    fn test_find_folder_cover_bob_marley_catch_a_fire() {
+        let p = std::path::Path::new(r"D:\Music\Bob Marley & The Wailers\Catch a Fire [Deluxe Edition] Disc 1");
+        if p.exists() {
+            let cover = find_folder_cover(p);
+            assert!(cover.is_some(), "Should find album cover art in Catch a Fire Disc 1 directory");
+            let (data, mime) = cover.unwrap();
+            println!("Catch a Fire cover size: {} bytes, mime: {:?}", data.len(), mime);
+            // 1,305 バイトの真っ黒な Folder.jpg ではなく、29,335 バイトの本物のジャケットが選ばれること
+            assert!(data.len() > 2000, "Should ignore dummy Folder.jpg (1305 bytes) and select large cover");
+            assert_eq!(data.len(), 29335);
         }
     }
 }

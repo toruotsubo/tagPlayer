@@ -403,6 +403,12 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
         {albums.map((album) => {
           const coverSrc = album.cover_url ? convertFileSrc(album.cover_url) : null;
+          const autoArtistTag =
+            album.tags.find((t) => t.toLowerCase() === album.artist.toLowerCase()) ||
+            (album.artist ? album.artist : null);
+          const otherTags = album.tags.filter(
+            (t) => t.toLowerCase() !== album.artist.toLowerCase()
+          );
 
           return (
             <div
@@ -431,31 +437,46 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
               </div>
 
               {/* Album Info */}
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-zinc-100 truncate group-hover:text-indigo-300 transition">
+              <div className="flex flex-col gap-1.5 min-w-0">
+                <span
+                  className="text-xs font-semibold text-zinc-100 truncate group-hover:text-indigo-300 transition"
+                  title={album.title}
+                >
                   {album.title}
                 </span>
-                <span className="text-[11px] text-zinc-400 truncate">
-                  {album.artist}
-                </span>
+
+                {/* Auto Artist Tag */}
+                {autoArtistTag && (
+                  <div className="flex items-center">
+                    <span
+                      className={`text-[11px] px-1.5 py-0.5 rounded border font-mono truncate max-w-full ${
+                        tagColorClasses[getTagCategory(autoArtistTag)] || tagColorClasses.artist
+                      }`}
+                      title={`#${autoArtistTag}`}
+                    >
+                      #{autoArtistTag}
+                    </span>
+                  </div>
+                )}
 
                 {/* Tags preview */}
-                {album.tags.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1 mt-1.5">
-                    {album.tags.slice(0, 3).map((tag, idx) => {
+                {otherTags.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                    {otherTags.slice(0, 3).map((tag, idx) => {
                       const category = getTagCategory(tag);
                       return (
                         <span
                           key={idx}
                           className={`text-[11px] px-1.5 py-0.5 rounded border font-mono truncate max-w-[80px] ${tagColorClasses[category]}`}
+                          title={`#${tag}`}
                         >
                           #{tag}
                         </span>
                       );
                     })}
-                    {album.tags.length > 3 && (
+                    {otherTags.length > 3 && (
                       <span className="text-[11px] text-zinc-500">
-                        +{album.tags.length - 3}
+                        +{otherTags.length - 3}
                       </span>
                     )}
                   </div>
@@ -487,26 +508,61 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                     )}
                   </div>
                   <div className="flex flex-col justify-center min-w-0 flex-1">
-                    <h2 className="text-lg font-bold text-zinc-100 truncate">{activeAlbum.title}</h2>
-                    <p className="text-xs text-zinc-400 mt-0.5 truncate">{activeAlbum.artist}</p>
+                    <h2 className="text-lg font-bold text-zinc-100 truncate" title={activeAlbum.title}>
+                      {activeAlbum.title}
+                    </h2>
+
+                    {/* Auto-acquired Artist Tag */}
+                    {(() => {
+                      const autoArtistTag =
+                        activeAlbum.tags.find((t) => t.toLowerCase() === activeAlbum.artist.toLowerCase()) ||
+                        (activeAlbum.artist ? activeAlbum.artist : null);
+                      if (!autoArtistTag) return null;
+                      const hasTagInAlbum = activeAlbum.tags.some(
+                        (t) => t.toLowerCase() === autoArtistTag.toLowerCase()
+                      );
+                      return (
+                        <div className="flex items-center mt-1">
+                          <span
+                            className={`group/tag inline-flex items-center gap-1 text-[11px] pl-2 pr-1.5 py-0.5 rounded-full border select-text cursor-text ${
+                              tagColorClasses[getTagCategory(autoArtistTag)] || tagColorClasses.artist
+                            }`}
+                            title={`#${autoArtistTag}`}
+                          >
+                            <span className="select-text cursor-text">#{autoArtistTag}</span>
+                            {hasTagInAlbum && (
+                              <button
+                                onClick={() => handleRemoveAlbumTag(autoArtistTag)}
+                                className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none"
+                                title="タグを削除"
+                              >
+                                <X className="h-2.5 w-2.5" />
+                              </button>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })()}
 
                     {/* Album Tags with Edit & Delete */}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-                      {activeAlbum.tags.map((t, i) => (
-                        <span
-                          key={i}
-                          className={`group/tag inline-flex items-center gap-1 text-[11px] pl-2 pr-1.5 py-0.5 rounded-full border select-text cursor-text ${tagColorClasses[getTagCategory(t)]}`}
-                        >
-                          <span className="select-text cursor-text">#{t}</span>
-                          <button
-                            onClick={() => handleRemoveAlbumTag(t)}
-                            className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none"
-                            title="タグを削除"
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      {activeAlbum.tags
+                        .filter((t) => t.toLowerCase() !== activeAlbum.artist.toLowerCase())
+                        .map((t, i) => (
+                          <span
+                            key={i}
+                            className={`group/tag inline-flex items-center gap-1 text-[11px] pl-2 pr-1.5 py-0.5 rounded-full border select-text cursor-text ${tagColorClasses[getTagCategory(t)]}`}
                           >
-                            <X className="h-2.5 w-2.5" />
-                          </button>
-                        </span>
-                      ))}
+                            <span className="select-text cursor-text">#{t}</span>
+                            <button
+                              onClick={() => handleRemoveAlbumTag(t)}
+                              className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none"
+                              title="タグを削除"
+                            >
+                              <X className="h-2.5 w-2.5" />
+                            </button>
+                          </span>
+                        ))}
 
                       {/* Add Album Tag Button / Input */}
                       {isAddingAlbumTag ? (
