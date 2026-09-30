@@ -684,7 +684,7 @@ function App() {
                       className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-[10px] cursor-pointer hover:bg-indigo-500/30 transition flex items-center gap-1"
                       title="クリックで解除"
                     >
-                      #{tag}
+                      #<span className="ml-0.5">{tag}</span>
                       <span className="text-[9px] text-indigo-400">×</span>
                     </span>
                   ))}

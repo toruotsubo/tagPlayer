@@ -94,14 +94,14 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
         <>
           {/* Tag Play & Match Mode Actions */}
           {selectedTags.length > 0 && (
-            <div className="flex flex-col gap-2 p-2.5 rounded-lg bg-indigo-950/30 border border-indigo-500/30 animate-in fade-in">
+            <div className="flex flex-col gap-2 p-2.5 rounded-lg bg-indigo-950/30 border border-indigo-400/80 animate-in fade-in">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-indigo-300">
                   {selectedTags.length} 件のタグを選択中
                 </span>
                 <button
                   onClick={onClearTags}
-                  className="text-[10px] text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                  className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 hover:text-white border border-zinc-700/60 text-[11px] transition cursor-pointer shadow-xs"
                 >
                   解除
                 </button>
@@ -186,12 +186,15 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
               <button
                 key={cat}
                 onClick={() => setTagCategory(cat)}
-                className={`px-2.5 py-0.5 rounded transition cursor-pointer ${tagCategory === cat
+                className={`px-2 py-0.5 rounded transition cursor-pointer flex items-center gap-1.5 ${tagCategory === cat
                     ? "bg-zinc-800 text-zinc-200 font-medium"
                     : "text-zinc-500 hover:text-zinc-300"
                   }`}
               >
-                {categoryLabels[cat]}
+                {cat !== "all" && (
+                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${categoryDotClasses[cat]}`} />
+                )}
+                <span>{categoryLabels[cat]}</span>
               </button>
             ))}
           </div>
@@ -233,15 +236,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
             )}
           </div>
 
-          {/* Footer Legend */}
-          <div className="pt-2 border-t border-zinc-800/60 grid grid-cols-2 gap-y-1 text-[10px] text-zinc-500">
-            {(["genre", "artist", "composer", "release_year", "other"] as TagCategory[]).map((category) => (
-              <span key={category} className="flex items-center gap-1">
-                <span className={`h-1.5 w-1.5 rounded-full ${categoryDotClasses[category]}`} />
-                {categoryLabels[category]}
-              </span>
-            ))}
-          </div>
+
         </>
       ) : (
         /* Saved Playlists Tab */

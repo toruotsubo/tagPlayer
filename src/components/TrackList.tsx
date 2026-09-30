@@ -261,7 +261,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                           onClick={() => onToggleTag?.(t)}
                           className="cursor-pointer hover:underline"
                         >
-                          #{t}
+                          #<span className="text-zinc-300 ml-0.5">{t}</span>
                         </span>
                         {onRemoveTrackTag && (
                           <button
