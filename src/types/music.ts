@@ -1,5 +1,19 @@
 export type TagCategory = "genre" | "artist" | "composer" | "release_year" | "other";
 
+export type AlbumSortOrder =
+  | "artist-title-year"
+  | "artist-year-title"
+  | "genre-artist-title-year"
+  | "genre-artist-year-title";
+
+export const categoryDotClasses: Record<TagCategory, string> = {
+  genre: "bg-amber-400",
+  artist: "bg-emerald-400",
+  composer: "bg-purple-400",
+  release_year: "bg-sky-400",
+  other: "bg-indigo-400",
+};
+
 export interface TagItem {
   id: number;
   name: string;

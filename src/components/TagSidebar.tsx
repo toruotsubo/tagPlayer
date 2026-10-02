@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Tag,
   Search,
@@ -6,10 +6,11 @@ import {
   Play,
   ListMusic,
   Trash2,
-  SlidersHorizontal,
   X,
+  ArrowUpDown,
+  ListPlus,
 } from "lucide-react";
-import { Playlist, TagCategory, TagItem } from "../types/music";
+import { Playlist, TagCategory, TagItem, categoryDotClasses } from "../types/music";
 
 interface TagSidebarProps {
   tags: TagItem[];
@@ -20,10 +21,13 @@ interface TagSidebarProps {
   onToggleTag: (tagName: string) => void;
   onClearTags: () => void;
   onPlaySelectedTags: () => void;
+  onQueueSelectedTags: () => void;
   playlists: Playlist[];
   onPlayPlaylist: (playlist: Playlist) => void;
   onDeletePlaylist: (playlistId: number) => void;
 }
+
+export type TagSortOrder = "count-asc" | "count-desc" | "name-asc" | "name-desc";
 
 export const TagSidebar: React.FC<TagSidebarProps> = ({
   tags,
@@ -34,6 +38,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
   onToggleTag,
   onClearTags,
   onPlaySelectedTags,
+  onQueueSelectedTags,
   playlists,
   onPlayPlaylist,
   onDeletePlaylist,
@@ -41,22 +46,26 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"tags" | "playlists">("tags");
   const [tagCategory, setTagCategory] = useState<"all" | TagCategory>("all");
+  const [tagSortOrder, setTagSortOrder] = useState<TagSortOrder>(() => {
+    const saved = localStorage.getItem("tagPlayer_tagSortOrder");
+    if (
+      saved === "count-asc" ||
+      saved === "count-desc" ||
+      saved === "name-asc" ||
+      saved === "name-desc"
+    ) {
+      return saved;
+    }
+    return "count-asc";
+  });
 
   const categoryLabels: Record<"all" | TagCategory, string> = {
-    all: "全種",
+    all: "すべて",
     genre: "ジャンル",
     artist: "アーティスト",
     composer: "作曲",
     release_year: "リリース年",
     other: "その他",
-  };
-
-  const categoryDotClasses: Record<TagCategory, string> = {
-    genre: "bg-amber-400",
-    artist: "bg-emerald-400",
-    composer: "bg-purple-400",
-    release_year: "bg-sky-400",
-    other: "bg-indigo-400",
   };
 
   const filteredTags = tags.filter((t) => {
@@ -65,6 +74,29 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
     if (viewMode === "albums" && t.target_type === "track") return false;
     return tagCategory === "all" || t.category === tagCategory;
   });
+
+  const sortedTags = useMemo(() => {
+    return [...filteredTags].sort((a, b) => {
+      switch (tagSortOrder) {
+        case "count-asc":
+          if (a.count !== b.count) {
+            return a.count - b.count;
+          }
+          return a.name.localeCompare(b.name, "ja", { sensitivity: "base" });
+        case "count-desc":
+          if (a.count !== b.count) {
+            return b.count - a.count;
+          }
+          return a.name.localeCompare(b.name, "ja", { sensitivity: "base" });
+        case "name-asc":
+          return a.name.localeCompare(b.name, "ja", { sensitivity: "base" });
+        case "name-desc":
+          return b.name.localeCompare(a.name, "ja", { sensitivity: "base" });
+        default:
+          return 0;
+      }
+    });
+  }, [filteredTags, tagSortOrder]);
 
   return (
     <aside className="w-72 border-r border-zinc-800/80 bg-zinc-900/40 p-4 flex flex-col gap-3.5 overflow-hidden select-none">
@@ -136,37 +168,70 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
                 })}
               </div>
 
-              <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                <span className="flex items-center gap-1">
-                  <SlidersHorizontal className="h-3 w-3" /> 条件:
-                </span>
+              {/* AND / OR トグルボタンスイッチ (2件以上の選択時のみ表示) */}
+              {selectedTags.length > 1 && (
+                <div className="grid grid-cols-2 rounded-lg bg-zinc-950/80 p-0.5 border border-zinc-800 text-xs shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!matchAll) onToggleMatchMode();
+                    }}
+                    className={`py-1.5 text-center rounded-md transition text-[11px] font-medium cursor-pointer flex items-center justify-center gap-1 ${
+                      matchAll
+                        ? "bg-zinc-800 text-indigo-300 shadow-sm border border-zinc-700/60 font-semibold"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    <span>AND</span>
+                    <span className="text-[10px] opacity-75">(すべて一致)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (matchAll) onToggleMatchMode();
+                    }}
+                    className={`py-1.5 text-center rounded-md transition text-[11px] font-medium cursor-pointer flex items-center justify-center gap-1 ${
+                      !matchAll
+                        ? "bg-zinc-800 text-indigo-300 shadow-sm border border-zinc-700/60 font-semibold"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    <span>OR</span>
+                    <span className="text-[10px] opacity-75">(いずれか一致)</span>
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center gap-1.5 mt-1">
                 <button
-                  onClick={onToggleMatchMode}
-                  className="px-2 py-0.5 rounded bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-200 transition font-mono cursor-pointer"
+                  onClick={onPlaySelectedTags}
+                  className="flex-1 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
+                  title="選択タグの曲で新しく再生開始"
                 >
-                  {matchAll ? "AND (すべて一致)" : "OR (いずれか一致)"}
+                  <Play className="h-3.5 w-3.5 fill-current" />
+                  再生
+                </button>
+                <button
+                  onClick={onQueueSelectedTags}
+                  className="flex-1 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
+                  title="選択タグの曲を再生キューに追加"
+                >
+                  <ListPlus className="h-3.5 w-3.5" />
+                  キューに追加
                 </button>
               </div>
-
-              <button
-                onClick={onPlaySelectedTags}
-                className="w-full mt-1 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
-              >
-                <Play className="h-3.5 w-3.5 fill-current" />
-                タグからプレイリスト再生
-              </button>
             </div>
           )}
 
           {/* Search Input */}
           <div className="relative flex items-center">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500 pointer-events-none" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="タグを検索..."
-              className="w-full rounded-lg bg-zinc-950/60 border border-zinc-800/80 pl-8 pr-8 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none transition"
+              className="w-full rounded-lg bg-zinc-950/70 border border-zinc-700 hover:border-zinc-600 pl-8 pr-8 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 focus:outline-none transition shadow-inner"
             />
             {searchQuery && (
               <button
@@ -181,32 +246,57 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
           </div>
 
           {/* Tag categories */}
-          <div className="flex flex-wrap gap-1 text-[11px]">
-            {(["all", "genre", "artist", "composer", "release_year", "other"] as const).map((cat) => (
+          <div className="grid grid-cols-3 gap-1 text-[11px]">
+            {(["all", "genre", "artist", "release_year", "composer", "other"] as const).map((cat) => (
               <button
                 key={cat}
                 onClick={() => setTagCategory(cat)}
-                className={`px-2 py-0.5 rounded transition cursor-pointer flex items-center gap-1.5 ${tagCategory === cat
-                    ? "bg-zinc-800 text-zinc-200 font-medium"
-                    : "text-zinc-500 hover:text-zinc-300"
-                  }`}
+                className={`py-1 px-1 rounded-md transition cursor-pointer flex items-center justify-center gap-1 text-center ${
+                  tagCategory === cat
+                    ? "bg-zinc-800 text-zinc-100 font-medium border border-zinc-700/60 shadow-xs"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60 border border-transparent"
+                }`}
               >
                 {cat !== "all" && (
                   <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${categoryDotClasses[cat]}`} />
                 )}
-                <span>{categoryLabels[cat]}</span>
+                <span className="truncate">{categoryLabels[cat]}</span>
               </button>
             ))}
           </div>
 
+          {/* Tag Sort */}
+          <div className="flex items-center justify-end text-[11px] px-0.5 pt-0.5">
+            <div className="flex items-center gap-1.5">
+              <ArrowUpDown className="h-3 w-3 text-zinc-500 shrink-0" />
+              <select
+                value={tagSortOrder}
+                onChange={(e) => {
+                  const nextSort = e.target.value as TagSortOrder;
+                  setTagSortOrder(nextSort);
+                  try {
+                    localStorage.setItem("tagPlayer_tagSortOrder", nextSort);
+                  } catch {}
+                }}
+                className="bg-zinc-950/80 border border-zinc-800 text-zinc-300 rounded px-1.5 py-0.5 text-[11px] focus:outline-none focus:border-indigo-500 cursor-pointer transition hover:border-zinc-700"
+                aria-label="タグの並び順"
+              >
+                <option value="count-asc" className="bg-zinc-900 text-zinc-200">登録数昇順</option>
+                <option value="count-desc" className="bg-zinc-900 text-zinc-200">登録数降順</option>
+                <option value="name-asc" className="bg-zinc-900 text-zinc-200">テキスト昇順</option>
+                <option value="name-desc" className="bg-zinc-900 text-zinc-200">テキスト降順</option>
+              </select>
+            </div>
+          </div>
+
           {/* Tag List */}
           <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-1">
-            {filteredTags.length === 0 ? (
+            {sortedTags.length === 0 ? (
               <div className="text-center py-8 text-xs text-zinc-500">
                 該当するタグがありません
               </div>
             ) : (
-              filteredTags.map((tag) => {
+              sortedTags.map((tag) => {
                 const isSelected = selectedTags.includes(tag.name);
                 return (
                   <button

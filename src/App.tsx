@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   FolderOpen,
   Disc3,
@@ -15,6 +15,7 @@ import {
   Repeat,
   Repeat1,
   Check,
+  ArrowUpDown,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
@@ -29,6 +30,8 @@ import {
   TagCategory,
   Track,
   TrackWithAlbum,
+  categoryDotClasses,
+  AlbumSortOrder,
 } from "./types/music";
 import { TagSidebar } from "./components/TagSidebar";
 import { AlbumGrid } from "./components/AlbumGrid";
@@ -439,6 +442,28 @@ function App() {
     }
   };
 
+  // タグ一致曲をすべてキューに追加
+  const handleQueueSelectedTags = async () => {
+    if (selectedTags.length === 0) return;
+    try {
+      const tracks = await invoke<TrackWithAlbum[]>("get_tracks_by_tags", {
+        tags: selectedTags,
+        matchAll,
+      });
+
+      if (tracks.length === 0) {
+        alert("選択したタグに一致する曲がありませんでした。");
+        return;
+      }
+
+      setQueue((prev) => [...prev, ...tracks]);
+      showToast(`${tracks.length} 曲をキューに追加しました`);
+    } catch (err) {
+      console.error("Failed to queue tag tracks", err);
+      alert(`キュー追加エラー: ${err}`);
+    }
+  };
+
   // 保存済みプレイリストの再生
   const handlePlaySavedPlaylist = async (playlist: Playlist) => {
     try {
@@ -573,6 +598,20 @@ function App() {
     setSelectedTags([]);
   };
 
+  // アルバム一覧のソート順
+  const [albumSortOrder, setAlbumSortOrder] = useState<AlbumSortOrder>(() => {
+    const saved = localStorage.getItem("tagPlayer_albumSortOrder");
+    if (
+      saved === "artist-title-year" ||
+      saved === "artist-year-title" ||
+      saved === "genre-artist-title-year" ||
+      saved === "genre-artist-year-title"
+    ) {
+      return saved;
+    }
+    return "artist-title-year";
+  });
+
   // アルバム一覧のタグ絞り込み
   const filteredAlbums = library.albums.filter((album) => {
     if (selectedTags.length === 0) return true;
@@ -582,6 +621,44 @@ function App() {
       return selectedTags.some((tag) => album.tags.includes(tag));
     }
   });
+
+  // アルバム一覧のソート処理
+  const sortedAlbums = useMemo(() => {
+    const compareText = (a: string | undefined | null, b: string | undefined | null) => {
+      const sA = (a ?? "").trim();
+      const sB = (b ?? "").trim();
+      if (!sA && !sB) return 0;
+      if (!sA) return 1;
+      if (!sB) return -1;
+      return sA.localeCompare(sB, "ja", { sensitivity: "base" });
+    };
+
+    const compareYear = (a: number | undefined | null, b: number | undefined | null) => {
+      const yA = a ?? 9999;
+      const yB = b ?? 9999;
+      return yA - yB;
+    };
+
+    return [...filteredAlbums].sort((a, b) => {
+      const cmpArtist = compareText(a.artist, b.artist);
+      const cmpTitle = compareText(a.title, b.title);
+      const cmpYear = compareYear(a.release_year, b.release_year);
+      const cmpGenre = compareText(a.genre, b.genre);
+
+      switch (albumSortOrder) {
+        case "artist-title-year":
+          return cmpArtist || cmpTitle || cmpYear;
+        case "artist-year-title":
+          return cmpArtist || cmpYear || cmpTitle;
+        case "genre-artist-title-year":
+          return cmpGenre || cmpArtist || cmpTitle || cmpYear;
+        case "genre-artist-year-title":
+          return cmpGenre || cmpArtist || cmpYear || cmpTitle;
+        default:
+          return 0;
+      }
+    });
+  }, [filteredAlbums, albumSortOrder]);
 
   const formatTime = (secs: number) => {
     const safeSecs = Math.max(0, Math.floor(secs));
@@ -598,11 +675,7 @@ function App() {
     <div className="flex h-screen w-screen flex-col bg-zinc-950 text-zinc-100 overflow-hidden select-none">
       {/* Top Header */}
       <header className="flex h-12 items-center justify-between border-b border-zinc-800/80 px-4 bg-zinc-900/50 backdrop-blur z-20">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-400 font-mono">
-            {library.albums.length} アルバム / {library.total_tracks} トラック
-          </span>
-        </div>
+        <div className="flex items-center gap-2" />
 
         <div className="flex items-center gap-3">
           {loading && (
@@ -634,6 +707,7 @@ function App() {
           onToggleTag={handleToggleTag}
           onClearTags={handleClearTags}
           onPlaySelectedTags={handlePlaySelectedTags}
+          onQueueSelectedTags={handleQueueSelectedTags}
           playlists={playlists}
           onPlayPlaylist={handlePlaySavedPlaylist}
           onDeletePlaylist={handleDeletePlaylist}
@@ -642,52 +716,94 @@ function App() {
         {/* Content Area */}
         <main className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-zinc-900/20 to-zinc-950 flex flex-col gap-4">
           {/* View Mode Switcher & Filter Info */}
-          <div className="flex items-center justify-between pb-3 border-b border-zinc-800/60">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleSwitchViewMode("albums")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${viewMode === "albums"
-                    ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
-                  }`}
-              >
-                <Disc3 className="h-3.5 w-3.5" />
-                <span>アルバム</span>
-                <span className="text-[10px] text-zinc-500 font-mono">
-                  ({filteredAlbums.length})
-                </span>
-              </button>
+          <div className="flex items-center justify-between pb-3 border-b border-zinc-800/60 gap-4 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleSwitchViewMode("albums")}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${viewMode === "albums"
+                      ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
+                    }`}
+                >
+                  <Disc3 className="h-3.5 w-3.5" />
+                  <span>アルバム</span>
+                  <span className="text-[10px] text-zinc-500 font-mono">
+                    ({sortedAlbums.length})
+                  </span>
+                </button>
 
-              <button
-                onClick={() => handleSwitchViewMode("tracks")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${viewMode === "tracks"
-                    ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
-                  }`}
-              >
-                <Music2 className="h-3.5 w-3.5" />
-                <span>曲</span>
-                <span className="text-[10px] text-zinc-500 font-mono">
-                  ({selectedTags.length > 0 ? tagTracks.length : library.total_tracks})
-                </span>
-              </button>
+                <button
+                  onClick={() => handleSwitchViewMode("tracks")}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${viewMode === "tracks"
+                      ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
+                    }`}
+                >
+                  <Music2 className="h-3.5 w-3.5" />
+                  <span>曲</span>
+                  <span className="text-[10px] text-zinc-500 font-mono">
+                    ({selectedTags.length > 0 ? tagTracks.length : library.total_tracks})
+                  </span>
+                </button>
+              </div>
+
+              {/* アルバム並び順セレクタ (アルバムタブ選択時のみ表示) */}
+              {viewMode === "albums" && (
+                <div className="flex items-center gap-1.5 text-xs text-zinc-400 border-l border-zinc-800 pl-3">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+                  <span className="text-[11px] text-zinc-400">並び順:</span>
+                  <select
+                    value={albumSortOrder}
+                    onChange={(e) => {
+                      const next = e.target.value as AlbumSortOrder;
+                      setAlbumSortOrder(next);
+                      try {
+                        localStorage.setItem("tagPlayer_albumSortOrder", next);
+                      } catch {}
+                    }}
+                    className="bg-zinc-900 border border-zinc-700 hover:border-zinc-600 text-zinc-200 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer transition shadow-xs font-medium"
+                    aria-label="アルバムの並び順"
+                  >
+                    <option value="artist-title-year" className="bg-zinc-900 text-zinc-200">
+                      アーティスト&gt;タイトル&gt;リリース年
+                    </option>
+                    <option value="artist-year-title" className="bg-zinc-900 text-zinc-200">
+                      アーティスト&gt;リリース年&gt;タイトル
+                    </option>
+                    <option value="genre-artist-title-year" className="bg-zinc-900 text-zinc-200">
+                      ジャンル&gt;アーティスト&gt;タイトル&gt;リリース年
+                    </option>
+                    <option value="genre-artist-year-title" className="bg-zinc-900 text-zinc-200">
+                      ジャンル&gt;アーティスト&gt;リリース年&gt;タイトル
+                    </option>
+                  </select>
+                </div>
+              )}
             </div>
 
             {selectedTags.length > 0 && (
               <div className="flex items-center gap-2 text-xs text-zinc-400">
                 <span>選択中:</span>
                 <div className="flex items-center gap-1 flex-wrap">
-                  {selectedTags.map((tag) => (
-                    <span
-                      key={tag}
-                      onClick={() => handleToggleTag(tag)}
-                      className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-[10px] cursor-pointer hover:bg-indigo-500/30 transition flex items-center gap-1"
-                      title="クリックで解除"
-                    >
-                      #<span className="ml-0.5">{tag}</span>
-                      <span className="text-[9px] text-indigo-400">×</span>
-                    </span>
-                  ))}
+                  {selectedTags.map((tag) => {
+                    const tagItem = library.tags.find((t) => t.name === tag);
+                    const category = tagItem?.category || "other";
+                    return (
+                      <span
+                        key={tag}
+                        onClick={() => handleToggleTag(tag)}
+                        className="px-2 py-0.5 rounded-full bg-zinc-900/80 border border-zinc-700/60 text-zinc-200 text-[10px] cursor-pointer hover:bg-zinc-800 transition flex items-center gap-1.5"
+                        title="クリックで解除"
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full shrink-0 ${categoryDotClasses[category]}`}
+                        />
+                        <span>{tag}</span>
+                        <span className="text-[9px] text-zinc-400 hover:text-red-400">×</span>
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -695,7 +811,7 @@ function App() {
 
           {viewMode === "albums" ? (
             <AlbumGrid
-              albums={filteredAlbums}
+              albums={sortedAlbums}
               selectedTags={selectedTags}
               availableTags={library.tags}
               currentPlayingTrackId={currentTrack?.id}

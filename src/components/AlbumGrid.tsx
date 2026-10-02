@@ -14,7 +14,7 @@ import {
   Square,
   MinusSquare,
 } from "lucide-react";
-import { Album, TagCategory, TagItem, Track } from "../types/music";
+import { Album, TagCategory, TagItem, Track, categoryDotClasses } from "../types/music";
 import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
@@ -182,7 +182,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
         ? "ジャンル"
         : "リリース年";
       const confirmed = window.confirm(
-        `タグ「#${tagName}」は楽曲メタデータから自動生成された${tagTypeLabel}タグです。\n削除してもよろしいですか？`
+        `タグ「${tagName}」は楽曲メタデータから自動生成された${tagTypeLabel}タグです。\n削除してもよろしいですか？`
       );
       if (!confirmed) return;
     }
@@ -511,14 +511,24 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                 {/* Auto Artist Tag */}
                 {autoArtistTag && (
                   <div className="flex items-center">
-                    <span
-                      className={`text-[11px] px-1.5 py-0.5 rounded border font-mono truncate max-w-full ${
-                        tagColorClasses[getTagCategory(autoArtistTag)] || tagColorClasses.artist
-                      }`}
-                      title={`#${autoArtistTag}`}
-                    >
-                      #<span className="text-zinc-300 ml-0.5">{autoArtistTag}</span>
-                    </span>
+                    {(() => {
+                      const category = getTagCategory(autoArtistTag);
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1.5 text-[11px] px-1.5 py-0.5 rounded border font-mono truncate max-w-full ${
+                            tagColorClasses[category] || tagColorClasses.artist
+                          }`}
+                          title={autoArtistTag}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                              categoryDotClasses[category] || categoryDotClasses.artist
+                            }`}
+                          />
+                          <span className="text-zinc-300 truncate">{autoArtistTag}</span>
+                        </span>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -530,10 +540,13 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                       return (
                         <span
                           key={idx}
-                          className={`text-[11px] px-1.5 py-0.5 rounded border font-mono truncate max-w-[80px] ${tagColorClasses[category]}`}
-                          title={`#${tag}`}
+                          className={`inline-flex items-center gap-1.5 text-[11px] px-1.5 py-0.5 rounded border font-mono truncate max-w-[90px] ${tagColorClasses[category]}`}
+                          title={tag}
                         >
-                          #<span className="text-zinc-300 ml-0.5">{tag}</span>
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full shrink-0 ${categoryDotClasses[category]}`}
+                          />
+                          <span className="text-zinc-300 truncate">{tag}</span>
                         </span>
                       );
                     })}
@@ -584,22 +597,28 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                       const hasTagInAlbum = activeAlbum.tags.some(
                         (t) => t.toLowerCase() === autoArtistTag.toLowerCase()
                       );
+                      const category = getTagCategory(autoArtistTag);
                       return (
                         <div className="flex items-center mt-1">
                           <span
-                            className={`group/tag inline-flex items-center gap-1 text-[11px] pl-2 pr-1.5 py-0.5 rounded-full border select-text cursor-text ${
-                              tagColorClasses[getTagCategory(autoArtistTag)] || tagColorClasses.artist
+                            className={`group/tag inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-3 pr-2.5 py-1 rounded-full border select-text cursor-text ${
+                              tagColorClasses[category] || tagColorClasses.artist
                             }`}
-                            title={`#${autoArtistTag}`}
+                            title={autoArtistTag}
                           >
-                            <span className="select-text cursor-text">#<span className="text-zinc-300 ml-0.5">{autoArtistTag}</span></span>
+                            <span
+                              className={`h-2 w-2 rounded-full shrink-0 ${
+                                categoryDotClasses[category] || categoryDotClasses.artist
+                              }`}
+                            />
+                            <span className="select-text cursor-text text-zinc-200">{autoArtistTag}</span>
                             {hasTagInAlbum && (
                               <button
                                 onClick={() => handleRemoveAlbumTag(autoArtistTag)}
-                                className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none"
+                                className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none ml-0.5"
                                 title="タグを削除"
                               >
-                                <X className="h-2.5 w-2.5" />
+                                <X className="h-3.5 w-3.5" />
                               </button>
                             )}
                           </span>
@@ -608,26 +627,32 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                     })()}
 
                     {/* Album Tags with Edit & Delete */}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                      {sortAlbumTags(activeAlbum.tags, activeAlbum).map((t, i) => (
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      {sortAlbumTags(activeAlbum.tags, activeAlbum).map((t, i) => {
+                        const category = getTagCategory(t);
+                        return (
                           <span
                             key={i}
-                            className={`group/tag inline-flex items-center gap-1 text-[11px] pl-2 pr-1.5 py-0.5 rounded-full border select-text cursor-text ${tagColorClasses[getTagCategory(t)]}`}
+                            className={`group/tag inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-3 pr-2.5 py-1 rounded-full border select-text cursor-text ${tagColorClasses[category]}`}
                           >
-                            <span className="select-text cursor-text">#<span className="text-zinc-300 ml-0.5">{t}</span></span>
+                            <span
+                              className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}
+                            />
+                            <span className="select-text cursor-text text-zinc-200">{t}</span>
                             <button
                               onClick={() => handleRemoveAlbumTag(t)}
-                              className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none"
+                              className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none ml-0.5"
                               title="タグを削除"
                             >
-                              <X className="h-2.5 w-2.5" />
+                              <X className="h-3.5 w-3.5" />
                             </button>
                           </span>
-                        ))}
+                        );
+                      })}
 
                       {/* Add Album Tag Button / Input */}
                       {isAddingAlbumTag ? (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
                           <input
                             type="text"
                             value={newAlbumTag}
@@ -647,12 +672,12 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                             }}
                             placeholder="タグ名..."
                             autoFocus
-                            className="text-[11px] px-2 py-0.5 rounded-full bg-zinc-950 border border-indigo-500/60 text-zinc-100 w-24 focus:outline-none"
+                            className="text-xs sm:text-sm px-3 py-1 rounded-full bg-zinc-950 border border-indigo-500/60 text-zinc-100 w-28 sm:w-32 focus:outline-none"
                           />
                           <select
                             value={newAlbumTagCategory}
                             onChange={(e) => setNewAlbumTagCategory(e.target.value as TagCategory)}
-                            className="text-[11px] px-1 py-0.5 rounded bg-zinc-950 border border-zinc-700 text-zinc-300 focus:outline-none"
+                            className="text-xs sm:text-sm px-2 py-1 rounded-lg bg-zinc-950 border border-zinc-700 text-zinc-300 focus:outline-none"
                             aria-label="アルバムタグの分類"
                           >
                             {tagCategories.map((category) => (
@@ -661,7 +686,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                           </select>
                           <button
                             onClick={() => handleAddAlbumTag(newAlbumTag)}
-                            className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 cursor-pointer"
+                            className="text-xs sm:text-sm px-3 py-1 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 cursor-pointer font-medium"
                           >
                             追加
                           </button>
@@ -670,31 +695,31 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                               setIsAddingAlbumTag(false);
                               setNewAlbumTag("");
                             }}
-                            className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                            className="text-zinc-500 hover:text-zinc-300 cursor-pointer p-0.5"
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ) : (
                         <button
                           onClick={() => setIsAddingAlbumTag(true)}
-                          className="inline-flex items-center gap-0.5 text-[11px] px-2 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white transition cursor-pointer shadow-sm"
+                          className="inline-flex items-center gap-1 text-xs sm:text-sm px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white transition cursor-pointer shadow-sm font-medium"
                         >
-                          <Plus className="h-2.5 w-2.5" /> タグ追加
+                          <Plus className="h-3.5 w-3.5" /> タグ追加
                         </button>
                       )}
                     </div>
 
                     {/* Tag Suggestions for Album */}
                     {isAddingAlbumTag && (
-                      <div className="flex flex-wrap items-center gap-1 mt-2 text-[11px] text-zinc-500">
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2 text-xs text-zinc-500">
                         <span>{newAlbumTag.trim() ? "候補:" : "よく使う候補:"}</span>
                         {albumTagSuggestions.length > 0 ? (
                           albumTagSuggestions.map((s) => (
                             <button
                               key={s.id}
                               onClick={() => handleAddAlbumTag(s.name, s.category)}
-                              className={`px-1.5 py-0.5 rounded border text-[11px] transition cursor-pointer flex items-center gap-0.5 hover:brightness-125 ${
+                              className={`px-2 py-0.5 rounded border text-xs transition cursor-pointer flex items-center gap-1 hover:brightness-125 ${
                                 tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
                               }`}
                               title={`タグ「${s.name}」(${tagCategories.find(c => c.value === s.category)?.label || s.category}) を追加`}
@@ -881,8 +906,8 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
 
                           {/* Tag Suggestions for Batch */}
                           {batchTagSuggestions.length > 0 && (
-                            <div className="flex flex-wrap items-center gap-1 text-[11px] text-zinc-400">
-                              <span className="text-zinc-500 text-[11px]">
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
+                              <span className="text-zinc-500 text-xs">
                                 {batchTrackTag.trim() ? "候補:" : "よく使う候補:"}
                               </span>
                               {batchTagSuggestions.map((s) => (
@@ -890,7 +915,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                                   key={s.id}
                                   type="button"
                                   onClick={() => handleBatchAddTrackTag(s.name, s.category)}
-                                  className={`px-1.5 py-0.5 rounded border text-[11px] transition cursor-pointer hover:brightness-125 flex items-center gap-0.5 ${
+                                  className={`px-2 py-0.5 rounded border text-xs transition cursor-pointer hover:brightness-125 flex items-center gap-1 ${
                                     tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
                                   }`}
                                   title={`選択中の ${selectedTrackIds.size} 曲に「${s.name}」を一括追加`}
@@ -904,19 +929,22 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                           {/* Existing Tags in Selected Tracks (with batch remove) */}
                           {selectedTrackTagsSummary.length > 0 && (
                             <div className="pt-2 border-t border-zinc-800/80">
-                              <div className="text-[11px] text-zinc-400 mb-1.5 flex items-center gap-1">
+                              <div className="text-xs text-zinc-400 mb-2 flex items-center gap-1 font-medium">
                                 <span>選択曲に付いているタグ (×で選択曲から一括削除):</span>
                               </div>
-                              <div className="flex flex-wrap gap-1.5">
+                              <div className="flex flex-wrap gap-2">
                                 {selectedTrackTagsSummary.map((item) => {
                                   const category = getTagCategory(item.name);
                                   return (
                                     <span
                                       key={item.name}
-                                      className={`inline-flex items-center gap-1 text-[11px] pl-2 pr-1.5 py-0.5 rounded-full border select-text cursor-text ${tagColorClasses[category]}`}
+                                      className={`inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-3 pr-2.5 py-1 rounded-full border select-text cursor-text ${tagColorClasses[category]}`}
                                     >
-                                      <span className="select-text cursor-text">#<span className="text-zinc-300 ml-0.5">{item.name}</span></span>
-                                      <span className="text-[10px] opacity-70 font-mono select-none">
+                                      <span
+                                        className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}
+                                      />
+                                      <span className="select-text cursor-text text-zinc-200">{item.name}</span>
+                                      <span className="text-xs opacity-70 font-mono select-none">
                                         ({item.count}/{selectedTrackIds.size})
                                       </span>
                                       <button
@@ -925,7 +953,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                                         className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer ml-0.5 select-none"
                                         title={`選択したすべての曲から「${item.name}」を一括削除`}
                                       >
-                                        <X className="h-2.5 w-2.5" />
+                                        <X className="h-3.5 w-3.5" />
                                       </button>
                                     </span>
                                   );
@@ -1017,21 +1045,24 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                                 onMouseDown={(e) => e.stopPropagation()}
                               >
                                 {/* Track tags list */}
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                   {track.tags.map((t, tagIdx) => {
                                     const category = getTagCategory(t);
                                     return (
                                       <span
                                         key={tagIdx}
-                                        className={`inline-flex items-center gap-0.5 text-[11px] pl-1.5 pr-1 py-0.5 rounded border select-text cursor-text ${tagColorClasses[category]}`}
+                                        className={`inline-flex items-center gap-1.5 text-xs font-medium pl-2.5 pr-2 py-1 rounded-md border select-text cursor-text ${tagColorClasses[category]}`}
                                       >
-                                        <span className="select-text cursor-text">#<span className="text-zinc-300 ml-0.5">{t}</span></span>
+                                        <span
+                                          className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}
+                                        />
+                                        <span className="select-text cursor-text text-zinc-200">{t}</span>
                                         <button
                                           onClick={() => handleRemoveTrackTag(track.id, t)}
-                                          className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none"
+                                          className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none ml-0.5"
                                           title="タグを削除"
                                         >
-                                          <X className="h-2.5 w-2.5" />
+                                          <X className="h-3 w-3" />
                                         </button>
                                       </span>
                                     );
@@ -1060,12 +1091,12 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                                           }}
                                           placeholder="曲タグ..."
                                           autoFocus
-                                          className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-950 border border-emerald-500/60 text-zinc-100 w-20 focus:outline-none"
+                                          className="text-xs px-2 py-1 rounded bg-zinc-950 border border-emerald-500/60 text-zinc-100 w-24 focus:outline-none"
                                         />
                                         <select
                                           value={newTrackTagCategory}
                                           onChange={(e) => setNewTrackTagCategory(e.target.value as TagCategory)}
-                                          className="text-[11px] px-1 py-0.5 rounded bg-zinc-950 border border-zinc-700 text-zinc-300 focus:outline-none"
+                                          className="text-xs px-1.5 py-1 rounded bg-zinc-950 border border-zinc-700 text-zinc-300 focus:outline-none"
                                           aria-label="曲タグの分類"
                                         >
                                           {tagCategories.map((category) => (
@@ -1076,7 +1107,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                                         </select>
                                         <button
                                           onClick={() => handleAddTrackTag(track.id, newTrackTag)}
-                                          className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-500 cursor-pointer"
+                                          className="text-xs px-2 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-500 cursor-pointer font-medium"
                                         >
                                           追加
                                         </button>
@@ -1085,19 +1116,19 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                                             setEditingTrackId(null);
                                             setNewTrackTag("");
                                           }}
-                                          className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                                          className="text-zinc-500 hover:text-zinc-300 cursor-pointer p-0.5"
                                         >
-                                          <X className="h-2.5 w-2.5" />
+                                          <X className="h-3 w-3" />
                                         </button>
                                       </div>
                                       {trackTagSuggestions.length > 0 && (
-                                        <div className="flex flex-wrap items-center gap-1 mt-0.5 text-[10px] text-zinc-500">
+                                        <div className="flex flex-wrap items-center gap-1 mt-0.5 text-xs text-zinc-500">
                                           <span>候補:</span>
                                           {trackTagSuggestions.map((s) => (
                                             <button
                                               key={s.id}
                                               onClick={() => handleAddTrackTag(track.id, s.name, s.category)}
-                                              className={`px-1 py-0.2 rounded border text-[10px] transition cursor-pointer hover:brightness-125 ${
+                                              className={`px-1.5 py-0.5 rounded border text-xs transition cursor-pointer hover:brightness-125 ${
                                                 tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
                                               }`}
                                               title={`タグ「${s.name}」(${
@@ -1117,10 +1148,10 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                                         setNewTrackTag("");
                                         setNewTrackTagCategory("other");
                                       }}
-                                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-zinc-700 text-zinc-500 hover:text-zinc-300 transition cursor-pointer"
+                                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
                                       title="曲にタグを追加"
                                     >
-                                      <Plus className="h-3 w-3" />
+                                      <Plus className="h-3.5 w-3.5" />
                                     </button>
                                   )}
                                 </div>

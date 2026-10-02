@@ -9,7 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { TagCategory, TagItem, TrackWithAlbum } from "../types/music";
+import { TagCategory, TagItem, TrackWithAlbum, categoryDotClasses } from "../types/music";
 
 interface TrackListProps {
   tracks: TrackWithAlbum[];
@@ -143,22 +143,22 @@ export const TrackList: React.FC<TrackListProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {onPlayAll && tracks.length > 0 && (
             <button
               onClick={() => onPlayAll(tracks)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-medium transition cursor-pointer shadow-sm"
-              title="一致するすべての曲を再生"
+              className="w-28 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
+              title="すべての曲を再生"
             >
               <Play className="h-3.5 w-3.5 fill-current" />
-              すべて再生
+              再生
             </button>
           )}
           {onQueueAll && tracks.length > 0 && (
             <button
               onClick={() => onQueueAll(tracks)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 text-xs font-medium border border-zinc-700/60 transition cursor-pointer"
-              title="一致するすべての曲を再生キューに追加"
+              className="w-28 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
+              title="すべての曲を再生キューに追加"
             >
               <ListPlus className="h-3.5 w-3.5" />
               キューに追加
@@ -249,7 +249,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                     return (
                       <span
                         key={tIdx}
-                        className={`inline-flex items-center gap-1 text-[10px] pl-2 pr-1.5 py-0.5 rounded-full border transition ${
+                        className={`inline-flex items-center gap-1.5 text-[10px] pl-2 pr-1.5 py-0.5 rounded-full border transition ${
                           tagColorClasses[category]
                         } ${
                           isTagSelected
@@ -258,10 +258,13 @@ export const TrackList: React.FC<TrackListProps> = ({
                         }`}
                       >
                         <span
+                          className={`h-1.5 w-1.5 rounded-full shrink-0 ${categoryDotClasses[category]}`}
+                        />
+                        <span
                           onClick={() => onToggleTag?.(t)}
-                          className="cursor-pointer hover:underline"
+                          className="cursor-pointer hover:underline text-zinc-300"
                         >
-                          #<span className="text-zinc-300 ml-0.5">{t}</span>
+                          {t}
                         </span>
                         {onRemoveTrackTag && (
                           <button
