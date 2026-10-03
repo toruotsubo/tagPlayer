@@ -16,6 +16,8 @@ import {
   Repeat1,
   Check,
   ArrowUpDown,
+  Search,
+  X,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
@@ -27,16 +29,19 @@ import {
   PlaybackStatus,
   Playlist,
   RepeatMode,
-  TagCategory,
   Track,
   TrackWithAlbum,
   categoryDotClasses,
   AlbumSortOrder,
+  TrackSortOrder,
 } from "./types/music";
 import { TagSidebar } from "./components/TagSidebar";
 import { AlbumGrid } from "./components/AlbumGrid";
 import { TrackList } from "./components/TrackList";
 import { QueueDrawer } from "./components/QueueDrawer";
+import { AlbumDetailModal } from "./components/AlbumDetailModal";
+import { AlbumSortSelect } from "./components/AlbumSortSelect";
+import { TrackSortSelect } from "./components/TrackSortSelect";
 import "./App.css";
 
 function App() {
@@ -65,8 +70,14 @@ function App() {
 
   // View Mode & Tracks by Tag
   const [viewMode, setViewMode] = useState<"albums" | "tracks">("albums");
+  const [albumSearchQuery, setAlbumSearchQuery] = useState("");
+  const [trackSearchQuery, setTrackSearchQuery] = useState("");
   const [tagTracks, setTagTracks] = useState<TrackWithAlbum[]>([]);
   const [loadingTagTracks, setLoadingTagTracks] = useState(false);
+
+  // Album Detail / Tag Edit Modal state
+  const [modalAlbum, setModalAlbum] = useState<Album | null>(null);
+  const [modalTrackId, setModalTrackId] = useState<number | null>(null);
 
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -358,46 +369,29 @@ function App() {
     showToast(`${tracks.length} 曲をキューに追加しました`);
   };
 
-  // トラックへのタグ追加
-  const handleAddTrackTag = async (
-    trackId: number,
-    tagName: string,
-    category: TagCategory = "other"
-  ) => {
-    try {
-      const updatedTags = await invoke<string[]>("add_track_tag", {
-        trackId,
-        tagName: tagName.trim(),
-        category,
-      });
-      setTagTracks((prev) =>
-        prev.map((t) => (t.id === trackId ? { ...t, tags: updatedTags } : t))
-      );
-      loadLibrary();
-    } catch (err) {
-      console.error("Add track tag error", err);
-    }
-  };
 
-  // トラックからのタグ削除
-  const handleRemoveTrackTag = async (trackId: number, tagName: string) => {
-    try {
-      const updatedTags = await invoke<string[]>("remove_track_tag", {
-        trackId,
-        tagName,
-      });
-      setTagTracks((prev) =>
-        prev.map((t) => (t.id === trackId ? { ...t, tags: updatedTags } : t))
-      );
-      loadLibrary();
-    } catch (err) {
-      console.error("Remove track tag error", err);
-    }
-  };
 
   // アルバム詳細モーダルからトラック選択時（互換用）
   const handleSelectTrackFromAlbum = async (track: Track, album: Album) => {
     handlePlaySingleTrack(track, album);
+  };
+
+  const handleOpenAlbumModal = (album: Album) => {
+    setModalAlbum(album);
+    setModalTrackId(null);
+  };
+
+  const handleOpenTrackTagEdit = (track: TrackWithAlbum) => {
+    const targetAlbum = library.albums.find((a) => a.id === track.album_id);
+    if (targetAlbum) {
+      setModalAlbum(targetAlbum);
+      setModalTrackId(track.id);
+    }
+  };
+
+  const handleCloseAlbumModal = () => {
+    setModalAlbum(null);
+    setModalTrackId(null);
   };
 
   // アルバムのライブラリからの削除
@@ -612,15 +606,34 @@ function App() {
     return "artist-title-year";
   });
 
-  // アルバム一覧のタグ絞り込み
-  const filteredAlbums = library.albums.filter((album) => {
-    if (selectedTags.length === 0) return true;
-    if (matchAll) {
-      return selectedTags.every((tag) => album.tags.includes(tag));
-    } else {
-      return selectedTags.some((tag) => album.tags.includes(tag));
-    }
-  });
+  // アルバム一覧の絞り込み（タグ選択 ＆ アルバム検索: タイトルとタグ）
+  const filteredAlbums = useMemo(() => {
+    const query = albumSearchQuery.trim().toLowerCase();
+    const queryTerms = query ? query.split(/\s+/).filter(Boolean) : [];
+
+    return library.albums.filter((album) => {
+      // タグ選択による絞り込み
+      if (selectedTags.length > 0) {
+        const matchesTags = matchAll
+          ? selectedTags.every((tag) => album.tags.includes(tag))
+          : selectedTags.some((tag) => album.tags.includes(tag));
+        if (!matchesTags) return false;
+      }
+
+      // アルバム検索による絞り込み（タイトルとタグ）
+      if (queryTerms.length > 0) {
+        const titleLower = album.title.toLowerCase();
+        const tagsLower = album.tags.map((t) => t.toLowerCase());
+
+        const matchesAllTerms = queryTerms.every((term) => {
+          return titleLower.includes(term) || tagsLower.some((t) => t.includes(term));
+        });
+        if (!matchesAllTerms) return false;
+      }
+
+      return true;
+    });
+  }, [library.albums, selectedTags, matchAll, albumSearchQuery]);
 
   // アルバム一覧のソート処理
   const sortedAlbums = useMemo(() => {
@@ -659,6 +672,75 @@ function App() {
       }
     });
   }, [filteredAlbums, albumSortOrder]);
+
+  // 曲一覧のソート順
+  const [trackSortOrder, setTrackSortOrder] = useState<TrackSortOrder>(() => {
+    const saved = localStorage.getItem("tagPlayer_trackSortOrder");
+    if (saved === "artist-album-disc-track" || saved === "title") {
+      return saved;
+    }
+    return "artist-album-disc-track";
+  });
+
+  // 曲一覧の絞り込み（曲検索: 曲タイトルとタグ）
+  const filteredTagTracks = useMemo(() => {
+    const query = trackSearchQuery.trim().toLowerCase();
+    const queryTerms = query ? query.split(/\s+/).filter(Boolean) : [];
+
+    if (queryTerms.length === 0) {
+      return tagTracks;
+    }
+
+    return tagTracks.filter((track) => {
+      const titleLower = track.title.toLowerCase();
+      const tagsLower = (track.tags || []).map((t) => t.toLowerCase());
+
+      return queryTerms.every((term) => {
+        return titleLower.includes(term) || tagsLower.some((t) => t.includes(term));
+      });
+    });
+  }, [tagTracks, trackSearchQuery]);
+
+  // 曲一覧のソート処理
+  const sortedTagTracks = useMemo(() => {
+    const compareText = (a: string | undefined | null, b: string | undefined | null) => {
+      const sA = (a ?? "").trim();
+      const sB = (b ?? "").trim();
+      if (!sA && !sB) return 0;
+      if (!sA) return 1;
+      if (!sB) return -1;
+      return sA.localeCompare(sB, "ja", { sensitivity: "base" });
+    };
+
+    return [...filteredTagTracks].sort((a, b) => {
+      if (trackSortOrder === "title") {
+        const cmpTitle = compareText(a.title, b.title);
+        if (cmpTitle !== 0) return cmpTitle;
+        const artistA = a.artist || a.album_artist;
+        const artistB = b.artist || b.album_artist;
+        return compareText(artistA, artistB);
+      }
+
+      // "artist-album-disc-track": アーティスト > アルバムタイトル > ディスク > トラック
+      const artistA = a.artist || a.album_artist;
+      const artistB = b.artist || b.album_artist;
+      const cmpArtist = compareText(artistA, artistB);
+      if (cmpArtist !== 0) return cmpArtist;
+
+      const cmpAlbum = compareText(a.album_title, b.album_title);
+      if (cmpAlbum !== 0) return cmpAlbum;
+
+      const discA = a.disc_number ?? 1;
+      const discB = b.disc_number ?? 1;
+      if (discA !== discB) return discA - discB;
+
+      const trackA = a.track_number ?? 1;
+      const trackB = b.track_number ?? 1;
+      if (trackA !== trackB) return trackA - trackB;
+
+      return compareText(a.title, b.title);
+    });
+  }, [filteredTagTracks, trackSortOrder]);
 
   const formatTime = (secs: number) => {
     const safeSecs = Math.max(0, Math.floor(secs));
@@ -743,7 +825,7 @@ function App() {
                   <Music2 className="h-3.5 w-3.5" />
                   <span>曲</span>
                   <span className="text-[10px] text-zinc-500 font-mono">
-                    ({selectedTags.length > 0 ? tagTracks.length : library.total_tracks})
+                    ({sortedTagTracks.length})
                   </span>
                 </button>
               </div>
@@ -753,31 +835,84 @@ function App() {
                 <div className="flex items-center gap-1.5 text-xs text-zinc-400 border-l border-zinc-800 pl-3">
                   <ArrowUpDown className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
                   <span className="text-[11px] text-zinc-400">並び順:</span>
-                  <select
+                  <AlbumSortSelect
                     value={albumSortOrder}
-                    onChange={(e) => {
-                      const next = e.target.value as AlbumSortOrder;
+                    onChange={(next) => {
                       setAlbumSortOrder(next);
                       try {
                         localStorage.setItem("tagPlayer_albumSortOrder", next);
                       } catch {}
                     }}
-                    className="bg-zinc-900 border border-zinc-700 hover:border-zinc-600 text-zinc-200 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer transition shadow-xs font-medium"
-                    aria-label="アルバムの並び順"
-                  >
-                    <option value="artist-title-year" className="bg-zinc-900 text-zinc-200">
-                      アーティスト&gt;タイトル&gt;リリース年
-                    </option>
-                    <option value="artist-year-title" className="bg-zinc-900 text-zinc-200">
-                      アーティスト&gt;リリース年&gt;タイトル
-                    </option>
-                    <option value="genre-artist-title-year" className="bg-zinc-900 text-zinc-200">
-                      ジャンル&gt;アーティスト&gt;タイトル&gt;リリース年
-                    </option>
-                    <option value="genre-artist-year-title" className="bg-zinc-900 text-zinc-200">
-                      ジャンル&gt;アーティスト&gt;リリース年&gt;タイトル
-                    </option>
-                  </select>
+                  />
+                </div>
+              )}
+
+              {/* 曲並び順セレクタ (曲タブ選択時のみ表示) */}
+              {viewMode === "tracks" && (
+                <div className="flex items-center gap-1.5 text-xs text-zinc-400 border-l border-zinc-800 pl-3">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+                  <span className="text-[11px] text-zinc-400">並び順:</span>
+                  <TrackSortSelect
+                    value={trackSortOrder}
+                    onChange={(next) => {
+                      setTrackSortOrder(next);
+                      try {
+                        localStorage.setItem("tagPlayer_trackSortOrder", next);
+                      } catch {}
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* アルバム検索フォーム (アルバムタブ選択時のみ表示) */}
+              {viewMode === "albums" && (
+                <div className="relative flex items-center w-48 sm:w-60 border-l border-zinc-800 pl-3">
+                  <div className="relative w-full flex items-center">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={albumSearchQuery}
+                      onChange={(e) => setAlbumSearchQuery(e.target.value)}
+                      placeholder="アルバム検索"
+                      className="w-full rounded-lg bg-zinc-950/70 border border-zinc-700 hover:border-zinc-600 pl-8 pr-8 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 focus:outline-none transition shadow-inner"
+                    />
+                    {albumSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setAlbumSearchQuery("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 p-0.5 rounded hover:bg-zinc-800/60 transition cursor-pointer"
+                        title="検索ワードをクリア"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 曲検索フォーム (曲タブ選択時のみ表示) */}
+              {viewMode === "tracks" && (
+                <div className="relative flex items-center w-48 sm:w-60 border-l border-zinc-800 pl-3">
+                  <div className="relative w-full flex items-center">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={trackSearchQuery}
+                      onChange={(e) => setTrackSearchQuery(e.target.value)}
+                      placeholder="曲検索"
+                      className="w-full rounded-lg bg-zinc-950/70 border border-zinc-700 hover:border-zinc-600 pl-8 pr-8 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 focus:outline-none transition shadow-inner"
+                    />
+                    {trackSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setTrackSearchQuery("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 p-0.5 rounded hover:bg-zinc-800/60 transition cursor-pointer"
+                        title="検索ワードをクリア"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -812,23 +947,23 @@ function App() {
           {viewMode === "albums" ? (
             <AlbumGrid
               albums={sortedAlbums}
+              searchQuery={albumSearchQuery}
               selectedTags={selectedTags}
               availableTags={library.tags}
               currentPlayingTrackId={currentTrack?.id}
               isPlaying={isPlaying}
-              onSelectTrack={handleSelectTrackFromAlbum}
-              onPlayTrack={handlePlaySingleTrack}
-              onQueueTrack={handleQueueSingleTrack}
+              onOpenAlbumModal={handleOpenAlbumModal}
               onPlayAlbum={handlePlayAlbum}
               onQueueAlbum={handleQueueAlbum}
-              onDeleteAlbum={handleDeleteAlbum}
-              onTagsChanged={loadLibrary}
+              onToggleTag={handleToggleTag}
             />
           ) : (
             <TrackList
-              tracks={tagTracks}
+              tracks={sortedTagTracks}
+              searchQuery={trackSearchQuery}
               selectedTags={selectedTags}
               availableTags={library.tags}
+              queue={queue}
               loading={loadingTagTracks}
               currentPlayingTrackId={currentTrack?.id}
               isPlaying={isPlaying}
@@ -837,8 +972,7 @@ function App() {
               onPlayAll={handlePlayAllTracks}
               onQueueAll={handleQueueAllTracks}
               onToggleTag={handleToggleTag}
-              onAddTrackTag={handleAddTrackTag}
-              onRemoveTrackTag={handleRemoveTrackTag}
+              onEditTrackTags={handleOpenTrackTagEdit}
             />
           )}
         </main>
@@ -851,6 +985,29 @@ function App() {
           <span>{toastMessage}</span>
         </div>
       )}
+
+      {/* Album Detail / Tag Edit Modal */}
+      <AlbumDetailModal
+        album={modalAlbum}
+        initialEditingTrackId={modalTrackId}
+        availableTags={library.tags}
+        queue={queue}
+        currentPlayingTrackId={currentTrack?.id}
+        isPlaying={isPlaying}
+        onClose={handleCloseAlbumModal}
+        onSelectTrack={handleSelectTrackFromAlbum}
+        onPlayTrack={handlePlaySingleTrack}
+        onQueueTrack={handleQueueSingleTrack}
+        onPlayAlbum={handlePlayAlbum}
+        onQueueAlbum={handleQueueAlbum}
+        onDeleteAlbum={handleDeleteAlbum}
+        onTagsChanged={() => {
+          loadLibrary();
+          if (selectedTags.length > 0 || viewMode === "tracks") {
+            loadTagTracks(selectedTags, matchAll);
+          }
+        }}
+      />
 
       {/* Playback Queue Drawer */}
       <QueueDrawer

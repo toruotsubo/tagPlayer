@@ -6,6 +6,8 @@ export type AlbumSortOrder =
   | "genre-artist-title-year"
   | "genre-artist-year-title";
 
+export type TrackSortOrder = "artist-album-disc-track" | "title";
+
 export const categoryDotClasses: Record<TagCategory, string> = {
   genre: "bg-amber-400",
   artist: "bg-emerald-400",
