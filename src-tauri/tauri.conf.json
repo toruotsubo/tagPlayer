@@ -16,6 +16,8 @@
         "title": "tagPlayer",
         "width": 1280,
         "height": 800,
+        "minWidth": 1024,
+        "minHeight": 700,
         "theme": "Dark",
         "backgroundColor": "#18181b"
       }

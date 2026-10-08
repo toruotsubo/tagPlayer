@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
-  FolderOpen,
+  DatabasePlus,
   Disc3,
   Play,
   Pause,
@@ -93,6 +93,26 @@ function App() {
 
   const isSeeking = useRef(false);
   const currentTrack = currentIndex >= 0 && currentIndex < queue.length ? queue[currentIndex] : null;
+
+  // キューに曲が追加された際、未選択なら先頭曲（インデックス0）を選択状態にする
+  useEffect(() => {
+    if (queue.length > 0) {
+      if (currentIndex < 0) {
+        setCurrentIndex(0);
+        setDurationSecs(queue[0].duration_secs);
+        setPositionSecs(0);
+      } else if (currentIndex >= queue.length) {
+        setCurrentIndex(queue.length - 1);
+        setDurationSecs(queue[queue.length - 1].duration_secs);
+      }
+    } else {
+      if (currentIndex !== -1) {
+        setCurrentIndex(-1);
+        setPositionSecs(0);
+        setDurationSecs(0);
+      }
+    }
+  }, [queue, currentIndex]);
 
   // 初回マウント時にDBからライブラリおよびプレイリストを復元
   useEffect(() => {
@@ -541,11 +561,17 @@ function App() {
         await invoke("pause_playback");
         setIsPlaying(false);
       } else {
-        await invoke("resume_playback");
-        setIsPlaying(true);
+        const status = await invoke<PlaybackStatus>("get_playback_status");
+        if (status.current_file_path === currentTrack.file_path) {
+          await invoke("resume_playback");
+          setIsPlaying(true);
+        } else {
+          await handlePlayTrackAtIndex(currentIndex);
+        }
       }
     } catch (err) {
       console.error("Toggle play error", err);
+      handlePlayTrackAtIndex(currentIndex);
     }
   };
 
@@ -580,6 +606,39 @@ function App() {
 
   const handleCycleRepeat = () => {
     setRepeatMode((prev) => (prev === "off" ? "all" : prev === "all" ? "one" : "off"));
+  };
+
+  const handleReorderQueue = (fromIndex: number, toIndex: number) => {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= queue.length ||
+      toIndex >= queue.length
+    ) {
+      return;
+    }
+
+    setQueue((prev) => {
+      const updated = [...prev];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+      return updated;
+    });
+
+    setCurrentIndex((prev) => {
+      if (prev < 0) return prev;
+      if (prev === fromIndex) {
+        return toIndex;
+      }
+      if (fromIndex < prev && toIndex >= prev) {
+        return prev - 1;
+      }
+      if (fromIndex > prev && toIndex <= prev) {
+        return prev + 1;
+      }
+      return prev;
+    });
   };
 
   const handleToggleTag = (tagName: string) => {
@@ -757,7 +816,25 @@ function App() {
     <div className="flex h-screen w-screen flex-col bg-zinc-950 text-zinc-100 overflow-hidden select-none">
       {/* Top Header */}
       <header className="flex h-12 items-center justify-between border-b border-zinc-800/80 px-4 bg-zinc-900/50 backdrop-blur z-20">
-        <div className="flex items-center gap-2" />
+        <div className="flex items-center">
+          <button
+            onClick={() => setIsQueueOpen(!isQueueOpen)}
+            className={`flex w-[calc(18rem-1rem)] items-center justify-between rounded-lg px-3.5 py-1.5 text-xs font-medium text-white transition active:scale-95 cursor-pointer shadow-sm ${
+              isQueueOpen
+                ? "bg-indigo-500 ring-1 ring-indigo-300/40"
+                : "bg-indigo-600/90 hover:bg-indigo-500"
+            }`}
+            title="再生キューを表示"
+          >
+            <div className="flex items-center gap-2">
+              <ListMusic className="h-3.5 w-3.5" />
+              <span>再生キュー</span>
+            </div>
+            <span className="rounded-full bg-black/25 px-1.5 py-0.5 text-[10px] font-mono leading-none">
+              {queue.length}
+            </span>
+          </button>
+        </div>
 
         <div className="flex items-center gap-3">
           {loading && (
@@ -771,8 +848,8 @@ function App() {
             disabled={loading}
             className="flex items-center gap-2 rounded-lg bg-indigo-600/90 px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-500 active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
           >
-            <FolderOpen className="h-3.5 w-3.5" />
-            ディレクトリを開く
+            <DatabasePlus className="h-3.5 w-3.5" />
+            登録
           </button>
         </div>
       </header>
@@ -810,8 +887,14 @@ function App() {
                 >
                   <Disc3 className="h-3.5 w-3.5" />
                   <span>アルバム</span>
-                  <span className="text-[10px] text-zinc-500 font-mono">
-                    ({sortedAlbums.length})
+                  <span
+                    className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border text-[10px] font-mono font-medium leading-none ${
+                      viewMode === "albums"
+                        ? "border-zinc-600 bg-zinc-900/80 text-zinc-200"
+                        : "border-zinc-700/80 bg-zinc-950/60 text-zinc-400"
+                    }`}
+                  >
+                    {sortedAlbums.length}
                   </span>
                 </button>
 
@@ -824,8 +907,14 @@ function App() {
                 >
                   <Music2 className="h-3.5 w-3.5" />
                   <span>曲</span>
-                  <span className="text-[10px] text-zinc-500 font-mono">
-                    ({sortedTagTracks.length})
+                  <span
+                    className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border text-[10px] font-mono font-medium leading-none ${
+                      viewMode === "tracks"
+                        ? "border-zinc-600 bg-zinc-900/80 text-zinc-200"
+                        : "border-zinc-700/80 bg-zinc-950/60 text-zinc-400"
+                    }`}
+                  >
+                    {sortedTagTracks.length}
                   </span>
                 </button>
               </div>
@@ -1029,6 +1118,8 @@ function App() {
           invoke("pause_playback");
         }}
         onSaveAsPlaylist={handleSaveAsPlaylist}
+        onReorderQueue={handleReorderQueue}
+        isPlaying={isPlaying}
       />
 
       {/* Bottom Player Controls */}
@@ -1147,7 +1238,7 @@ function App() {
           </div>
         </div>
 
-        {/* Volume & Queue Toggle */}
+        {/* Volume Control */}
         <div className="flex items-center justify-end gap-3 w-1/4">
           <div className="flex items-center gap-2">
             <button
@@ -1172,19 +1263,6 @@ function App() {
               title={`音量: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
             />
           </div>
-
-          {/* Queue Drawer Button */}
-          <button
-            onClick={() => setIsQueueOpen(!isQueueOpen)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition cursor-pointer text-xs ${isQueueOpen
-                ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40"
-                : "bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 border-zinc-700/60"
-              }`}
-            title="再生キューを表示"
-          >
-            <ListMusic className="h-3.5 w-3.5" />
-            <span className="font-mono text-[11px]">{queue.length}</span>
-          </button>
         </div>
       </footer>
     </div>

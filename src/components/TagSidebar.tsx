@@ -118,7 +118,17 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
               : "text-zinc-400 hover:text-zinc-200"
             }`}
         >
-          <ListMusic className="h-3.5 w-3.5" /> プレイリスト ({playlists.length})
+          <ListMusic className="h-3.5 w-3.5" />
+          <span>プレイリスト</span>
+          <span
+            className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border text-[10px] font-mono font-medium leading-none ${
+              activeTab === "playlists"
+                ? "border-zinc-600 bg-zinc-900/80 text-zinc-200"
+                : "border-zinc-700/80 bg-zinc-950/60 text-zinc-400"
+            }`}
+          >
+            {playlists.length}
+          </span>
         </button>
       </div>
 
