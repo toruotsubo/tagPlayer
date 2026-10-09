@@ -588,12 +588,13 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                         <button
                           key={s.id}
                           onClick={() => handleAddAlbumTag(s.name, s.category)}
-                          className={`px-2 py-0.5 rounded border text-xs transition cursor-pointer flex items-center gap-1 hover:brightness-125 ${
+                          className={`px-2 py-0.5 rounded border text-xs transition cursor-pointer flex items-center gap-0.5 hover:brightness-125 ${
                             tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
                           }`}
                           title={`タグ「${s.name}」(${tagCategories.find(c => c.value === s.category)?.label || s.category}) を追加`}
                         >
-                          <span>+{s.name}</span>
+                          <span>+</span>
+                          <span className="text-zinc-200">{s.name}</span>
                         </button>
                       ))
                     ) : newAlbumTag.trim() ? (
@@ -782,12 +783,13 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                               key={s.id}
                               type="button"
                               onClick={() => handleBatchAddTrackTag(s.name, s.category)}
-                              className={`px-2 py-0.5 rounded border text-xs transition cursor-pointer hover:brightness-125 flex items-center gap-1 ${
+                              className={`px-2 py-0.5 rounded border text-xs transition cursor-pointer hover:brightness-125 flex items-center gap-0.5 ${
                                 tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
                               }`}
                               title={`選択中の ${selectedTrackIds.size} 曲に「${s.name}」を一括追加`}
                             >
-                              <span>+{s.name}</span>
+                              <span>+</span>
+                              <span className="text-zinc-200">{s.name}</span>
                             </button>
                           ))}
                         </div>
@@ -1005,14 +1007,15 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                                         <button
                                           key={s.id}
                                           onClick={() => handleAddTrackTag(track.id, s.name, s.category)}
-                                          className={`px-1.5 py-0.5 rounded border text-xs transition cursor-pointer hover:brightness-125 ${
+                                          className={`px-1.5 py-0.5 rounded border text-xs transition cursor-pointer hover:brightness-125 flex items-center gap-0.5 ${
                                             tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
                                           }`}
                                           title={`タグ「${s.name}」(${
                                             tagCategories.find((c) => c.value === s.category)?.label || s.category
                                           }) を追加`}
                                         >
-                                          +{s.name}
+                                          <span>+</span>
+                                          <span className="text-zinc-200">{s.name}</span>
                                         </button>
                                       ))}
                                     </div>
