@@ -18,6 +18,7 @@ import {
   ArrowUpDown,
   Search,
   X,
+  Settings,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
@@ -42,9 +43,12 @@ import { QueueModal } from "./components/QueueModal";
 import { AlbumDetailModal } from "./components/AlbumDetailModal";
 import { AlbumSortSelect } from "./components/AlbumSortSelect";
 import { TrackSortSelect } from "./components/TrackSortSelect";
+import { SettingsModal } from "./components/SettingsModal";
+import { useTranslation } from "./i18n";
 import "./App.css";
 
 function App() {
+  const { t } = useTranslation();
   const [library, setLibrary] = useState<LibraryData>({
     albums: [],
     tags: [],
@@ -67,6 +71,7 @@ function App() {
   const [shuffle, setShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
   const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // View Mode & Tracks by Tag
   const [viewMode, setViewMode] = useState<"albums" | "tracks">("albums");
@@ -216,7 +221,7 @@ function App() {
       const selected = await open({
         directory: true,
         multiple: false,
-        title: "音楽フォルダを選択",
+        title: t.app.selectMusicFolder,
       });
 
       let dirPath: string | null = null;
@@ -228,7 +233,7 @@ function App() {
 
       if (dirPath) {
         setLoading(true);
-        setLoadingMessage(`「${dirPath}」内の音楽ファイルをスキャン中...`);
+        setLoadingMessage(t.app.scanning(dirPath));
 
         try {
           const result = await invoke<LibraryData>("scan_music_directory", {
@@ -238,11 +243,11 @@ function App() {
           setLibrary(result);
           loadPlaylists();
           if (result.albums.length === 0) {
-            alert(`「${dirPath}」内に対象の音楽ファイル（mp3, flac, m4a, wma, wav, ogg, aac）が見つかりませんでした。`);
+            alert(t.app.noMusicFilesFound(dirPath));
           }
         } catch (scanErr) {
           console.error("Scan error", scanErr);
-          alert(`スキャン中にエラーが発生しました: ${scanErr}`);
+          alert(t.app.scanError(scanErr));
         } finally {
           setLoading(false);
           setLoadingMessage(null);
@@ -272,7 +277,7 @@ function App() {
     } catch (err) {
       console.error("Play track error", err);
       setIsPlaying(false);
-      alert(`再生開始エラー: ${err}`);
+      alert(t.app.playError(err));
     }
   };
 
@@ -313,7 +318,7 @@ function App() {
     };
 
     setQueue((prev) => [...prev, trackWithAlbum]);
-    showToast(`「${track.title}」をキューに追加しました`);
+    showToast(t.toast.trackAddedToQueue(track.title));
   };
 
   // アルバム全曲再生
@@ -372,7 +377,7 @@ function App() {
     }));
 
     setQueue((prev) => [...prev, ...items]);
-    showToast(`「${album.title}」の ${items.length} 曲をキューに追加しました`);
+    showToast(t.toast.albumTracksAddedToQueue(album.title, items.length));
   };
 
   // 一致曲すべてをキューにして再生
@@ -386,7 +391,7 @@ function App() {
   const handleQueueAllTracks = (tracks: TrackWithAlbum[]) => {
     if (tracks.length === 0) return;
     setQueue((prev) => [...prev, ...tracks]);
-    showToast(`${tracks.length} 曲をキューに追加しました`);
+    showToast(t.toast.tracksAddedToQueue(tracks.length));
   };
 
 
@@ -417,13 +422,13 @@ function App() {
   // アルバムのライブラリからの削除
   const handleDeleteAlbum = async (albumId: number) => {
     const targetAlbum = library.albums.find((a) => a.id === albumId);
-    const albumTitle = targetAlbum?.title ?? "アルバム";
+    const albumTitle = targetAlbum?.title ?? t.common.albumFallback;
     await invoke("delete_album", { albumId });
     await loadLibrary();
     if (selectedTags.length > 0 || viewMode === "tracks") {
       loadTagTracks(selectedTags, matchAll);
     }
-    showToast(`「${albumTitle}」をライブラリから削除しました`);
+    showToast(t.toast.albumDeleted(albumTitle));
   };
 
   // タグからプレイリストを自動生成して再生
@@ -436,7 +441,7 @@ function App() {
       });
 
       if (tracks.length === 0) {
-        alert("選択したタグに一致する曲がありませんでした。");
+        alert(t.app.noTracksMatchingTags);
         return;
       }
 
@@ -452,7 +457,7 @@ function App() {
     } catch (err) {
       console.error("Failed to generate tag playlist", err);
       setIsPlaying(false);
-      alert(`プレイリスト生成エラー: ${err}`);
+      alert(t.app.playlistGenError(err));
     }
   };
 
@@ -466,15 +471,15 @@ function App() {
       });
 
       if (tracks.length === 0) {
-        alert("選択したタグに一致する曲がありませんでした。");
+        alert(t.app.noTracksMatchingTags);
         return;
       }
 
       setQueue((prev) => [...prev, ...tracks]);
-      showToast(`${tracks.length} 曲をキューに追加しました`);
+      showToast(t.toast.tracksAddedToQueue(tracks.length));
     } catch (err) {
       console.error("Failed to queue tag tracks", err);
-      alert(`キュー追加エラー: ${err}`);
+      alert(t.app.queueAddError(err));
     }
   };
 
@@ -486,7 +491,7 @@ function App() {
       });
 
       if (tracks.length === 0) {
-        alert("プレイリストに曲が含まれていません。");
+        alert(t.app.playlistEmpty);
         return;
       }
 
@@ -824,11 +829,11 @@ function App() {
                 ? "bg-indigo-500 ring-1 ring-indigo-300/40"
                 : "bg-indigo-600/90 hover:bg-indigo-500"
             }`}
-            title="再生キューを表示"
+            title={t.app.queueButtonTip}
           >
             <div className="flex items-center gap-2">
               <ListMusic className="h-3.5 w-3.5" />
-              <span>再生キュー</span>
+              <span>{t.app.queueButton}</span>
             </div>
             <span className="rounded-full bg-black/25 px-1.5 py-0.5 text-[10px] font-mono leading-none">
               {queue.length}
@@ -849,7 +854,14 @@ function App() {
             className="flex items-center gap-2 rounded-lg bg-indigo-600/90 px-3.5 py-2 text-xs font-medium text-white transition hover:bg-indigo-500 active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
           >
             <DatabasePlus className="h-3.5 w-3.5" />
-            登録
+            {t.app.registerButton}
+          </button>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="flex items-center justify-center p-2 rounded-lg bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-300 hover:text-white transition active:scale-95 cursor-pointer shadow-sm border border-zinc-700/60"
+            title={t.settings.openSettingsTip}
+          >
+            <Settings className="h-3.5 w-3.5" />
           </button>
         </div>
       </header>
@@ -886,7 +898,7 @@ function App() {
                     }`}
                 >
                   <Disc3 className="h-3.5 w-3.5" />
-                  <span>アルバム</span>
+                  <span>{t.app.albumsTab}</span>
                   <span
                     className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border text-[10px] font-mono font-medium leading-none ${
                       viewMode === "albums"
@@ -906,7 +918,7 @@ function App() {
                     }`}
                 >
                   <Music2 className="h-3.5 w-3.5" />
-                  <span>曲</span>
+                  <span>{t.app.tracksTab}</span>
                   <span
                     className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border text-[10px] font-mono font-medium leading-none ${
                       viewMode === "tracks"
@@ -923,7 +935,7 @@ function App() {
               {viewMode === "albums" && (
                 <div className="flex items-center gap-1.5 text-xs text-zinc-400 border-l border-zinc-800 pl-3">
                   <ArrowUpDown className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
-                  <span className="text-[11px] text-zinc-400">並び順:</span>
+                  <span className="text-[11px] text-zinc-400">{t.common.order}</span>
                   <AlbumSortSelect
                     value={albumSortOrder}
                     onChange={(next) => {
@@ -940,7 +952,7 @@ function App() {
               {viewMode === "tracks" && (
                 <div className="flex items-center gap-1.5 text-xs text-zinc-400 border-l border-zinc-800 pl-3">
                   <ArrowUpDown className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
-                  <span className="text-[11px] text-zinc-400">並び順:</span>
+                  <span className="text-[11px] text-zinc-400">{t.common.order}</span>
                   <TrackSortSelect
                     value={trackSortOrder}
                     onChange={(next) => {
@@ -962,7 +974,7 @@ function App() {
                       type="text"
                       value={albumSearchQuery}
                       onChange={(e) => setAlbumSearchQuery(e.target.value)}
-                      placeholder="アルバム検索"
+                      placeholder={t.app.albumSearchPlaceholder}
                       className="w-full rounded-lg bg-zinc-950/70 border border-zinc-700 hover:border-zinc-600 pl-8 pr-8 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 focus:outline-none transition shadow-inner"
                     />
                     {albumSearchQuery && (
@@ -970,7 +982,7 @@ function App() {
                         type="button"
                         onClick={() => setAlbumSearchQuery("")}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 p-0.5 rounded hover:bg-zinc-800/60 transition cursor-pointer"
-                        title="検索ワードをクリア"
+                        title={t.app.clearSearchTip}
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -988,7 +1000,7 @@ function App() {
                       type="text"
                       value={trackSearchQuery}
                       onChange={(e) => setTrackSearchQuery(e.target.value)}
-                      placeholder="曲検索"
+                      placeholder={t.app.trackSearchPlaceholder}
                       className="w-full rounded-lg bg-zinc-950/70 border border-zinc-700 hover:border-zinc-600 pl-8 pr-8 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 focus:outline-none transition shadow-inner"
                     />
                     {trackSearchQuery && (
@@ -996,7 +1008,7 @@ function App() {
                         type="button"
                         onClick={() => setTrackSearchQuery("")}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 p-0.5 rounded hover:bg-zinc-800/60 transition cursor-pointer"
-                        title="検索ワードをクリア"
+                        title={t.app.clearSearchTip}
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -1008,17 +1020,17 @@ function App() {
 
             {selectedTags.length > 0 && (
               <div className="flex items-center gap-2 text-xs text-zinc-400">
-                <span>選択中:</span>
+                <span>{t.app.selectedTagsPrefix}</span>
                 <div className="flex items-center gap-1 flex-wrap">
                   {selectedTags.map((tag) => {
-                    const tagItem = library.tags.find((t) => t.name === tag);
+                    const tagItem = library.tags.find((item) => item.name === tag);
                     const category = tagItem?.category || "other";
                     return (
                       <span
                         key={tag}
                         onClick={() => handleToggleTag(tag)}
                         className="px-2 py-0.5 rounded-full bg-zinc-900/80 border border-zinc-700/60 text-zinc-200 text-[10px] cursor-pointer hover:bg-zinc-800 transition flex items-center gap-1.5"
-                        title="クリックで解除"
+                        title={t.app.removeTagTip}
                       >
                         <span
                           className={`h-1.5 w-1.5 rounded-full shrink-0 ${categoryDotClasses[category]}`}
@@ -1124,6 +1136,12 @@ function App() {
         isPlaying={isPlaying}
       />
 
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
+
       {/* Bottom Player Controls */}
       <footer className="h-20 border-t border-zinc-800 bg-zinc-900/90 px-4 flex items-center justify-between backdrop-blur z-20 shadow-2xl">
         {/* Track Info */}
@@ -1137,10 +1155,10 @@ function App() {
           </div>
           <div className="flex flex-col overflow-hidden">
             <span className="text-xs font-semibold text-zinc-200 truncate">
-              {currentTrack?.title ?? "曲を選択してください"}
+              {currentTrack?.title ?? t.player.noTrackSelected}
             </span>
             <span className="text-[11px] text-zinc-400 truncate mt-0.5">
-              {currentTrack?.artist || currentTrack?.album_artist || "アーティスト名"}
+              {currentTrack?.artist || currentTrack?.album_artist || t.player.artistPlaceholder}
             </span>
           </div>
         </div>
@@ -1153,7 +1171,7 @@ function App() {
               onClick={() => setShuffle(!shuffle)}
               className={`p-1 rounded transition cursor-pointer ${shuffle ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"
                 }`}
-              title={shuffle ? "シャッフル: オン" : "シャッフル: オフ"}
+              title={shuffle ? t.player.shuffleOn : t.player.shuffleOff}
             >
               <Shuffle className="h-3.5 w-3.5" />
             </button>
@@ -1163,7 +1181,7 @@ function App() {
               onClick={handlePrev}
               disabled={!currentTrack}
               className="text-zinc-400 hover:text-zinc-200 transition cursor-pointer disabled:opacity-30"
-              title="前の曲"
+              title={t.player.prevTrack}
             >
               <SkipBack className="h-4 w-4" />
             </button>
@@ -1173,7 +1191,7 @@ function App() {
               onClick={handleTogglePlay}
               disabled={!currentTrack}
               className="h-9 w-9 rounded-full bg-zinc-100 text-zinc-950 flex items-center justify-center hover:bg-white active:scale-95 transition shadow cursor-pointer disabled:opacity-30"
-              title={isPlaying ? "一時停止" : "再生"}
+              title={isPlaying ? t.player.pause : t.player.play}
             >
               {isPlaying ? (
                 <Pause className="h-4 w-4 fill-current" />
@@ -1187,7 +1205,7 @@ function App() {
               onClick={handleNext}
               disabled={!currentTrack}
               className="text-zinc-400 hover:text-zinc-200 transition cursor-pointer disabled:opacity-30"
-              title="次の曲"
+              title={t.player.nextTrack}
             >
               <SkipForward className="h-4 w-4" />
             </button>
@@ -1197,7 +1215,13 @@ function App() {
               onClick={handleCycleRepeat}
               className={`p-1 rounded transition cursor-pointer ${repeatMode !== "off" ? "text-indigo-400" : "text-zinc-500 hover:text-zinc-300"
                 }`}
-              title={`リピート: ${repeatMode === "off" ? "オフ" : repeatMode === "all" ? "全曲" : "1曲"}`}
+              title={
+                repeatMode === "off"
+                  ? t.player.repeatOff
+                  : repeatMode === "all"
+                  ? t.player.repeatAll
+                  : t.player.repeatOne
+              }
             >
               {repeatMode === "one" ? (
                 <Repeat1 className="h-3.5 w-3.5" />
@@ -1246,7 +1270,7 @@ function App() {
             <button
               onClick={handleToggleMute}
               className="text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
-              title={isMuted ? "ミュート解除" : "ミュート"}
+              title={isMuted ? t.player.unmute : t.player.mute}
             >
               {isMuted || volume === 0 ? (
                 <VolumeX className="h-4 w-4 text-zinc-500" />
@@ -1262,7 +1286,7 @@ function App() {
               value={isMuted ? 0 : volume}
               onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
               className="w-20 h-1 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-indigo-400 hover:h-1.5 transition-all"
-              title={`音量: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
+              title={t.player.volumeTip(Math.round((isMuted ? 0 : volume) * 100))}
             />
           </div>
         </div>

@@ -11,6 +11,7 @@ import {
   ListPlus,
 } from "lucide-react";
 import { Playlist, TagCategory, TagItem, categoryDotClasses } from "../types/music";
+import { useTranslation } from "../i18n";
 
 interface TagSidebarProps {
   tags: TagItem[];
@@ -43,6 +44,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
   onPlayPlaylist,
   onDeletePlaylist,
 }) => {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"tags" | "playlists">("tags");
   const [tagCategory, setTagCategory] = useState<"all" | TagCategory>("all");
@@ -60,12 +62,12 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
   });
 
   const categoryLabels: Record<"all" | TagCategory, string> = {
-    all: "すべて",
-    genre: "ジャンル",
-    artist: "アーティスト",
-    composer: "作曲",
-    release_year: "リリース年",
-    other: "その他",
+    all: t.categories.all,
+    genre: t.categories.genre,
+    artist: t.categories.artist,
+    composer: t.categories.composer,
+    release_year: t.categories.release_year,
+    other: t.categories.other,
   };
 
   const filteredTags = tags.filter((t) => {
@@ -109,7 +111,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
               : "text-zinc-400 hover:text-zinc-200"
             }`}
         >
-          <Tag className="h-3.5 w-3.5" /> タグ
+          <Tag className="h-3.5 w-3.5" /> {t.sidebar.tagsTab}
         </button>
         <button
           onClick={() => setActiveTab("playlists")}
@@ -119,7 +121,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
             }`}
         >
           <ListMusic className="h-3.5 w-3.5" />
-          <span>プレイリスト</span>
+          <span>{t.sidebar.playlistsTab}</span>
           <span
             className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border text-[10px] font-mono font-medium leading-none ${
               activeTab === "playlists"
@@ -139,13 +141,13 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
             <div className="flex flex-col gap-2 p-2.5 rounded-lg bg-indigo-950/30 border border-indigo-400/80 animate-in fade-in">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-indigo-300">
-                  {selectedTags.length} 件のタグを選択中
+                  {t.sidebar.selectedTagsCount(selectedTags.length)}
                 </span>
                 <button
                   onClick={onClearTags}
                   className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 hover:text-white border border-zinc-700/60 text-[11px] transition cursor-pointer shadow-xs"
                 >
-                  解除
+                  {t.sidebar.clearTagsButton}
                 </button>
               </div>
 
@@ -169,7 +171,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
                         type="button"
                         onClick={() => onToggleTag(tagName)}
                         className="text-zinc-400 hover:text-red-400 p-0.5 -mr-0.5 rounded transition cursor-pointer"
-                        title={`${tagName} を解除`}
+                        title={t.sidebar.removeTagItemTip(tagName)}
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -192,8 +194,8 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
                         : "text-zinc-400 hover:text-zinc-200"
                     }`}
                   >
-                    <span>AND</span>
-                    <span className="text-[10px] opacity-75">(すべて一致)</span>
+                    <span>{t.common.and}</span>
+                    <span className="text-[10px] opacity-75">{t.common.andDesc}</span>
                   </button>
                   <button
                     type="button"
@@ -206,8 +208,8 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
                         : "text-zinc-400 hover:text-zinc-200"
                     }`}
                   >
-                    <span>OR</span>
-                    <span className="text-[10px] opacity-75">(いずれか一致)</span>
+                    <span>{t.common.or}</span>
+                    <span className="text-[10px] opacity-75">{t.common.orDesc}</span>
                   </button>
                 </div>
               )}
@@ -216,18 +218,18 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
                 <button
                   onClick={onPlaySelectedTags}
                   className="flex-1 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
-                  title="選択タグの曲で新しく再生開始"
+                  title={t.sidebar.playSelectedTagsTip}
                 >
                   <Play className="h-3.5 w-3.5 fill-current" />
-                  再生
+                  {t.common.play}
                 </button>
                 <button
                   onClick={onQueueSelectedTags}
                   className="flex-1 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
-                  title="選択タグの曲を再生キューに追加"
+                  title={t.sidebar.queueSelectedTagsTip}
                 >
                   <ListPlus className="h-3.5 w-3.5" />
-                  キューに追加
+                  {t.common.queue}
                 </button>
               </div>
             </div>
@@ -240,7 +242,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="タグ検索"
+              placeholder={t.sidebar.searchPlaceholder}
               className="w-full rounded-lg bg-zinc-950/70 border border-zinc-700 hover:border-zinc-600 pl-8 pr-8 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 focus:outline-none transition shadow-inner"
             />
             {searchQuery && (
@@ -248,7 +250,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
                 type="button"
                 onClick={() => setSearchQuery("")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 p-0.5 rounded hover:bg-zinc-800/60 transition cursor-pointer"
-                title="検索ワードをクリア"
+                title={t.app.clearSearchTip}
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -289,12 +291,12 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
                   } catch {}
                 }}
                 className="bg-zinc-950/80 border border-zinc-800 text-zinc-300 rounded px-1.5 py-0.5 text-[11px] focus:outline-none focus:border-indigo-500 cursor-pointer transition hover:border-zinc-700"
-                aria-label="タグの並び順"
+                aria-label={t.sidebar.sortLabel}
               >
-                <option value="count-asc" className="bg-zinc-900 text-zinc-200">登録数昇順</option>
-                <option value="count-desc" className="bg-zinc-900 text-zinc-200">登録数降順</option>
-                <option value="name-asc" className="bg-zinc-900 text-zinc-200">テキスト昇順</option>
-                <option value="name-desc" className="bg-zinc-900 text-zinc-200">テキスト降順</option>
+                <option value="count-asc" className="bg-zinc-900 text-zinc-200">{t.sidebar.sortCountAsc}</option>
+                <option value="count-desc" className="bg-zinc-900 text-zinc-200">{t.sidebar.sortCountDesc}</option>
+                <option value="name-asc" className="bg-zinc-900 text-zinc-200">{t.sidebar.sortNameAsc}</option>
+                <option value="name-desc" className="bg-zinc-900 text-zinc-200">{t.sidebar.sortNameDesc}</option>
               </select>
             </div>
           </div>
@@ -303,7 +305,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
           <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-1">
             {sortedTags.length === 0 ? (
               <div className="text-center py-8 text-xs text-zinc-500">
-                該当するタグがありません
+                {t.sidebar.noTagsFound}
               </div>
             ) : (
               sortedTags.map((tag) => {
@@ -344,9 +346,9 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
           {playlists.length === 0 ? (
             <div className="text-center py-12 text-xs text-zinc-500 flex flex-col items-center gap-2">
               <ListMusic className="h-6 w-6 text-zinc-700" />
-              保存済みプレイリストはありません
+              {t.sidebar.noPlaylistsFound}
               <span className="text-[11px] text-zinc-600">
-                再生キューから「プレイリストとして保存」できます
+                {t.sidebar.noPlaylistsSub}
               </span>
             </div>
           ) : (
@@ -365,7 +367,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
                       {pl.name}
                     </span>
                     <span className="text-[10px] text-zinc-500">
-                      {pl.track_count} 曲
+                      {t.sidebar.trackCount(pl.track_count)}
                     </span>
                   </div>
                 </div>
@@ -373,12 +375,12 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (confirm(`プレイリスト「${pl.name}」を削除しますか？`)) {
+                    if (confirm(t.sidebar.deletePlaylistConfirm(pl.name))) {
                       onDeletePlaylist(pl.id);
                     }
                   }}
                   className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-zinc-800 text-zinc-500 hover:text-red-400 transition cursor-pointer"
-                  title="削除"
+                  title={t.sidebar.deletePlaylistTip}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>

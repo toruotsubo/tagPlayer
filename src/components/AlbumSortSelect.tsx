@@ -1,30 +1,12 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { ChevronRight, ChevronDown, Check } from "lucide-react";
 import { AlbumSortOrder } from "../types/music";
+import { useTranslation } from "../i18n";
 
 interface AlbumSortOption {
   value: AlbumSortOrder;
   labels: string[];
 }
-
-const ALBUM_SORT_OPTIONS: AlbumSortOption[] = [
-  {
-    value: "artist-title-year",
-    labels: ["アーティスト", "タイトル", "リリース年"],
-  },
-  {
-    value: "artist-year-title",
-    labels: ["アーティスト", "リリース年", "タイトル"],
-  },
-  {
-    value: "genre-artist-title-year",
-    labels: ["ジャンル", "アーティスト", "タイトル", "リリース年"],
-  },
-  {
-    value: "genre-artist-year-title",
-    labels: ["ジャンル", "アーティスト", "リリース年", "タイトル"],
-  },
-];
 
 interface AlbumSortSelectProps {
   value: AlbumSortOrder;
@@ -35,8 +17,41 @@ export const AlbumSortSelect: React.FC<AlbumSortSelectProps> = ({
   value,
   onChange,
 }) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const sortOptions: AlbumSortOption[] = useMemo(
+    () => [
+      {
+        value: "artist-title-year",
+        labels: [t.albumSort.artist, t.albumSort.title, t.albumSort.releaseYear],
+      },
+      {
+        value: "artist-year-title",
+        labels: [t.albumSort.artist, t.albumSort.releaseYear, t.albumSort.title],
+      },
+      {
+        value: "genre-artist-title-year",
+        labels: [
+          t.albumSort.genre,
+          t.albumSort.artist,
+          t.albumSort.title,
+          t.albumSort.releaseYear,
+        ],
+      },
+      {
+        value: "genre-artist-year-title",
+        labels: [
+          t.albumSort.genre,
+          t.albumSort.artist,
+          t.albumSort.releaseYear,
+          t.albumSort.title,
+        ],
+      },
+    ],
+    [t]
+  );
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -66,8 +81,8 @@ export const AlbumSortSelect: React.FC<AlbumSortSelectProps> = ({
   }, [isOpen]);
 
   const currentOption =
-    ALBUM_SORT_OPTIONS.find((opt) => opt.value === value) ||
-    ALBUM_SORT_OPTIONS[0];
+    sortOptions.find((opt) => opt.value === value) ||
+    sortOptions[0];
 
   const renderSortLabels = (labels: string[]) => (
     <span className="inline-flex items-center gap-1">
@@ -90,7 +105,7 @@ export const AlbumSortSelect: React.FC<AlbumSortSelectProps> = ({
         className="bg-zinc-900 border border-zinc-700 hover:border-zinc-600 text-zinc-200 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer transition shadow-xs font-medium flex items-center gap-2"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        aria-label="アルバムの並び順"
+        aria-label={t.albumSort.label}
       >
         {renderSortLabels(currentOption.labels)}
         <ChevronDown
@@ -105,7 +120,7 @@ export const AlbumSortSelect: React.FC<AlbumSortSelectProps> = ({
           role="listbox"
           className="absolute left-0 mt-1 min-w-full w-max z-50 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
         >
-          {ALBUM_SORT_OPTIONS.map((option) => {
+          {sortOptions.map((option) => {
             const isSelected = option.value === value;
             return (
               <button

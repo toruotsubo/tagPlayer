@@ -9,6 +9,7 @@ import {
 import { Album, TagCategory, TagItem, Track, categoryDotClasses } from "../types/music";
 import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { useTranslation, getTranslation } from "../i18n";
 
 export interface AlbumGridProps {
   albums: Album[];
@@ -24,11 +25,11 @@ export interface AlbumGridProps {
 }
 
 export const tagCategories: { value: TagCategory; label: string }[] = [
-  { value: "genre", label: "ジャンル" },
-  { value: "artist", label: "アーティスト" },
-  { value: "composer", label: "作曲" },
-  { value: "release_year", label: "リリース年" },
-  { value: "other", label: "その他" },
+  { value: "genre", label: getTranslation().categories.genre },
+  { value: "artist", label: getTranslation().categories.artist },
+  { value: "composer", label: getTranslation().categories.composer },
+  { value: "release_year", label: getTranslation().categories.release_year },
+  { value: "other", label: getTranslation().categories.other },
 ];
 
 export const tagColorClasses: Record<TagCategory, string> = {
@@ -97,6 +98,8 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   onQueueAlbum,
   onToggleTag,
 }) => {
+  const { t } = useTranslation();
+
   const handlePlayAlbumClick = async (e: React.MouseEvent, album: Album) => {
     e.stopPropagation();
     try {
@@ -134,17 +137,17 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
         </div>
         <h2 className="text-base font-medium text-zinc-300">
           {hasSearch
-            ? "検索条件に一致するアルバムがありません"
+            ? t.albumGrid.noAlbumsFoundSearch
             : selectedTags.length > 0
-            ? "選択したタグに一致するアルバムがありません"
-            : "アルバムが見つかりません"}
+            ? t.albumGrid.noAlbumsFoundTags
+            : t.albumGrid.noAlbumsFoundEmpty}
         </h2>
         <p className="mt-1 text-xs text-zinc-500 max-w-sm">
           {hasSearch
-            ? "検索キーワードを変更するかクリアしてください。"
+            ? t.albumGrid.noAlbumsFoundSearchSub
             : selectedTags.length > 0
-            ? "タグフィルターの選択を解除するか変更してください。"
-            : "上部の「登録」から音楽ファイルを読み込んでください。"}
+            ? t.albumGrid.noAlbumsFoundTagsSub
+            : t.albumGrid.noAlbumsFoundEmptySub}
         </p>
       </div>
     );
@@ -186,28 +189,28 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                     type="button"
                     onClick={(e) => handlePlayAlbumClick(e, album)}
                     className="w-full py-1.5 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-medium flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900"
-                    title="アルバム全曲を再生"
+                    title={t.albumGrid.playAlbumTip}
                   >
                     <Play className="h-3.5 w-3.5 fill-current" />
-                    <span>再生</span>
+                    <span>{t.common.play}</span>
                   </button>
                   <button
                     type="button"
                     onClick={(e) => handleQueueAlbumClick(e, album)}
                     className="w-full py-1.5 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-medium flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900"
-                    title="アルバム全曲をキューに追加"
+                    title={t.albumGrid.queueAlbumTip}
                   >
                     <ListPlus className="h-3.5 w-3.5" />
-                    <span>キューに追加</span>
+                    <span>{t.common.queue}</span>
                   </button>
                   <button
                     type="button"
                     onClick={(e) => handleEditTagsClick(e, album)}
                     className="w-full py-1.5 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-medium flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900"
-                    title="タグ編集モーダルを開く"
+                    title={t.albumGrid.editTagsTip}
                   >
                     <Tag className="h-3.5 w-3.5" />
-                    <span>タグ編集</span>
+                    <span>{t.common.editTags}</span>
                   </button>
                 </div>
               </div>
@@ -238,7 +241,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                               ? tagSelectedColorClasses[category] || tagSelectedColorClasses.artist
                               : tagColorClasses[category] || tagColorClasses.artist
                           }`}
-                          title={`タグ「${autoArtistTag}」を選択タグに追加/解除`}
+                          title={t.albumGrid.toggleTagTip(autoArtistTag)}
                         >
                           <span
                             className={`h-1.5 w-1.5 rounded-full shrink-0 ${
@@ -270,7 +273,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                               ? tagSelectedColorClasses[category]
                               : tagColorClasses[category]
                           }`}
-                          title={`タグ「${tag}」を選択タグに追加/解除`}
+                          title={t.albumGrid.toggleTagTip(tag)}
                         >
                           <span
                             className={`h-1.5 w-1.5 rounded-full shrink-0 ${categoryDotClasses[category]}`}

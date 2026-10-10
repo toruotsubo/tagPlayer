@@ -17,6 +17,7 @@ import { Album, TagCategory, TagItem, Track, TrackWithAlbum, categoryDotClasses 
 import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { sortAlbumTags, tagCategories, tagColorClasses } from "./AlbumGrid";
+import { useTranslation } from "../i18n";
 
 interface AlbumDetailModalProps {
   album: Album | null;
@@ -51,6 +52,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   onDeleteAlbum,
   onTagsChanged,
 }) => {
+  const { t } = useTranslation();
   const queuedTrackIds = useMemo(() => new Set(queue.map((t) => t.id)), [queue]);
 
   const [activeAlbum, setActiveAlbum] = useState<Album | null>(album);
@@ -152,12 +154,12 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
 
     if (isArtistTag || isGenreTag || isReleaseYearTag) {
       const tagTypeLabel = isArtistTag
-        ? "アーティスト"
+        ? t.categories.artist
         : isGenreTag
-        ? "ジャンル"
-        : "リリース年";
+        ? t.categories.genre
+        : t.categories.release_year;
       const confirmed = window.confirm(
-        `タグ「${tagName}」は楽曲メタデータから自動生成された${tagTypeLabel}タグです。\n削除してもよろしいですか？`
+        t.albumDetailModal.deleteAutoTagConfirm(tagName, tagTypeLabel)
       );
       if (!confirmed) return;
     }
@@ -409,7 +411,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   const handleDeleteAlbum = async () => {
     if (!activeAlbum || !onDeleteAlbum) return;
     const confirmed = window.confirm(
-      `アルバム「${activeAlbum.title}」をライブラリから削除しますか？\n（音楽ファイル自体は削除されません）`
+      t.albumDetailModal.deleteAlbumConfirm(activeAlbum.title)
     );
     if (!confirmed) return;
     try {
@@ -477,7 +479,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                           <button
                             onClick={() => handleRemoveAlbumTag(autoArtistTag)}
                             className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none ml-0.5"
-                            title="タグを削除"
+                            title={t.albumDetailModal.removeTagTip}
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>
@@ -489,8 +491,8 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
 
                 {/* Album Tags with Edit & Delete */}
                 <div className="flex flex-wrap items-center gap-2 mt-2">
-                  {sortAlbumTags(activeAlbum.tags, activeAlbum).map((t, i) => {
-                    const category = getTagCategory(t);
+                  {sortAlbumTags(activeAlbum.tags, activeAlbum).map((tName, i) => {
+                    const category = getTagCategory(tName);
                     return (
                       <span
                         key={i}
@@ -499,11 +501,11 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                         <span
                           className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}
                         />
-                        <span className="select-text cursor-text text-zinc-200">{t}</span>
+                        <span className="select-text cursor-text text-zinc-200">{tName}</span>
                         <button
-                          onClick={() => handleRemoveAlbumTag(t)}
+                          onClick={() => handleRemoveAlbumTag(tName)}
                           className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none ml-0.5"
-                          title="タグを削除"
+                          title={t.albumDetailModal.removeTagTip}
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -521,7 +523,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                           const val = e.target.value;
                           setNewAlbumTag(val);
                           const matched = availableTags.find(
-                            (t) => t.name.toLowerCase() === val.trim().toLowerCase()
+                            (tag) => tag.name.toLowerCase() === val.trim().toLowerCase()
                           );
                           if (matched) {
                             setNewAlbumTagCategory(matched.category);
@@ -531,7 +533,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                           if (e.key === "Enter") handleAddAlbumTag(newAlbumTag);
                           if (e.key === "Escape") setIsAddingAlbumTag(false);
                         }}
-                        placeholder="アルバムタグ"
+                        placeholder={t.albumDetailModal.albumTagPlaceholder}
                         autoFocus
                         className="text-xs sm:text-sm px-3 py-1 rounded-full bg-zinc-950 border border-indigo-500/60 text-zinc-100 w-28 sm:w-32 focus:outline-none"
                       />
@@ -539,17 +541,19 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                         value={newAlbumTagCategory}
                         onChange={(e) => setNewAlbumTagCategory(e.target.value as TagCategory)}
                         className="text-xs sm:text-sm px-2 py-1 rounded-lg bg-zinc-950 border border-zinc-700 text-zinc-300 focus:outline-none"
-                        aria-label="アルバムタグの分類"
+                        aria-label={t.albumDetailModal.albumTagCategoryAria}
                       >
                         {tagCategories.map((category) => (
-                          <option key={category.value} value={category.value}>{category.label}</option>
+                          <option key={category.value} value={category.value}>
+                            {t.categories[category.value] || category.label}
+                          </option>
                         ))}
                       </select>
                       <button
                         onClick={() => handleAddAlbumTag(newAlbumTag)}
                         className="text-xs sm:text-sm px-3 py-1 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 cursor-pointer font-medium"
                       >
-                        追加
+                        {t.albumDetailModal.addAlbumTagButton}
                       </button>
                       <button
                         onClick={() => {
@@ -566,23 +570,23 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                       onClick={() => setIsAddingAlbumTag(true)}
                       className="inline-flex items-center gap-1 text-xs sm:text-sm px-3 py-1 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white transition cursor-pointer shadow-sm font-medium"
                     >
-                      <Plus className="h-3.5 w-3.5" /> タグ追加
+                      <Plus className="h-3.5 w-3.5" /> {t.albumDetailModal.addTagButton}
                     </button>
                   )}
 
                   <button
                     onClick={onClose}
                     className="inline-flex items-center gap-1 text-xs sm:text-sm px-3 py-1 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700/80 transition cursor-pointer shadow-sm font-medium"
-                    title="編集を終了してモーダルを閉じる"
+                    title={t.albumDetailModal.finishEditingTip}
                   >
-                    編集終了
+                    {t.albumDetailModal.finishEditingButton}
                   </button>
                 </div>
 
                 {/* Tag Suggestions for Album */}
                 {isAddingAlbumTag && (
                   <div className="flex flex-wrap items-center gap-1.5 mt-2 text-xs text-zinc-500">
-                    <span>候補:</span>
+                    <span>{t.common.candidates}</span>
                     {albumTagSuggestions.length > 0 ? (
                       albumTagSuggestions.map((s) => (
                         <button
@@ -591,14 +595,14 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                           className={`px-2 py-0.5 rounded border text-xs transition cursor-pointer flex items-center gap-0.5 hover:brightness-125 ${
                             tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
                           }`}
-                          title={`タグ「${s.name}」(${tagCategories.find(c => c.value === s.category)?.label || s.category}) を追加`}
+                          title={t.albumDetailModal.addTagSuggestTip(s.name, t.categories[s.category] || s.category)}
                         >
                           <span>+</span>
                           <span className="text-zinc-200">{s.name}</span>
                         </button>
                       ))
                     ) : newAlbumTag.trim() ? (
-                      <span className="text-zinc-500 italic">一致する候補がありません（Enterで新規追加）</span>
+                      <span className="text-zinc-500 italic">{t.albumDetailModal.noSuggestMatches}</span>
                     ) : null}
                   </div>
                 )}
@@ -608,7 +612,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
             <button
               onClick={onClose}
               className="text-zinc-400 hover:text-zinc-100 p-1.5 rounded-lg hover:bg-zinc-800 transition cursor-pointer shrink-0"
-              title="モーダルを閉じる"
+              title={t.albumDetailModal.closeModalTip}
             >
               <X className="h-5 w-5" />
             </button>
@@ -622,18 +626,18 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                   <button
                     onClick={() => onPlayAlbum?.(activeAlbum, tracks)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-medium transition cursor-pointer shadow-sm"
-                    title="アルバム全曲を再生"
+                    title={t.albumDetailModal.playAlbumTip}
                   >
                     <Play className="h-3.5 w-3.5 fill-current" />
-                    再生
+                    {t.common.play}
                   </button>
                   <button
                     onClick={() => onQueueAlbum?.(activeAlbum, tracks)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-medium transition cursor-pointer shadow-sm"
-                    title="アルバム全曲を再生キューに追加"
+                    title={t.albumDetailModal.queueAlbumTip}
                   >
                     <ListPlus className="h-3.5 w-3.5" />
-                    キューに追加
+                    {t.common.queue}
                   </button>
                 </>
               )}
@@ -645,10 +649,10 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                 onClick={handleDeleteAlbum}
                 disabled={isDeleting}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-red-950/50 text-zinc-400 hover:text-red-400 border border-zinc-700/60 hover:border-red-500/40 text-xs font-medium transition cursor-pointer disabled:opacity-50"
-                title="アルバムをライブラリから削除（音楽ファイル自体は削除されません）"
+                title={t.albumDetailModal.deleteAlbumTip}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span>削除</span>
+                <span>{t.common.delete}</span>
               </button>
             )}
           </div>
@@ -657,9 +661,9 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
         {/* Tracks List */}
         <div className="flex-1 overflow-y-auto p-4">
           {loadingTracks ? (
-            <div className="py-12 text-center text-xs text-zinc-500">トラック読み込み中...</div>
+            <div className="py-12 text-center text-xs text-zinc-500">{t.albumDetailModal.loadingTracks}</div>
           ) : sortedTracks.length === 0 ? (
-            <div className="py-12 text-center text-xs text-zinc-500">トラック情報がありません</div>
+            <div className="py-12 text-center text-xs text-zinc-500">{t.albumDetailModal.noTracks}</div>
           ) : (() => {
             const uniqueDiscs = Array.from(new Set(sortedTracks.map((t) => t.disc_number ?? 1)));
             const hasMultipleDiscs = uniqueDiscs.length > 1;
@@ -677,8 +681,8 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                         className="flex items-center gap-2 text-zinc-300 hover:text-white transition cursor-pointer select-none"
                         title={
                           selectedTrackIds.size === sortedTracks.length
-                            ? "全選択を解除"
-                            : "全曲を選択"
+                            ? t.albumDetailModal.deselectAllTip
+                            : t.albumDetailModal.selectAllTip
                         }
                       >
                         {selectedTrackIds.size === sortedTracks.length && sortedTracks.length > 0 ? (
@@ -690,14 +694,14 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                         )}
                         <span className="font-medium">
                           {selectedTrackIds.size === sortedTracks.length && sortedTracks.length > 0
-                            ? "全選択解除"
-                            : "すべて選択"}
+                            ? t.albumDetailModal.deselectAllButton
+                            : t.albumDetailModal.selectAllButton}
                         </span>
                       </button>
 
                       {selectedTrackIds.size > 0 && (
                         <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-medium">
-                          {selectedTrackIds.size} / {sortedTracks.length} 曲選択中
+                          {t.albumDetailModal.selectedTracksCount(selectedTrackIds.size, sortedTracks.length)}
                         </span>
                       )}
                     </div>
@@ -711,7 +715,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                         }}
                         className="text-[11px] text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
                       >
-                        選択解除
+                        {t.albumDetailModal.deselectButton}
                       </button>
                     )}
                   </div>
@@ -722,10 +726,10 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300">
                           <Tag className="h-3.5 w-3.5" />
-                          <span>選択した {selectedTrackIds.size} 曲のタグを一括編集</span>
+                          <span>{t.albumDetailModal.batchEditTitle(selectedTrackIds.size)}</span>
                         </div>
                         <span className="text-[10px] text-zinc-500 hidden sm:inline">
-                          Shift+クリックで曲の範囲選択が可能
+                          {t.albumDetailModal.batchRangeHint}
                         </span>
                       </div>
 
@@ -738,7 +742,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                             const val = e.target.value;
                             setBatchTrackTag(val);
                             const matched = availableTags.find(
-                              (t) => t.name.toLowerCase() === val.trim().toLowerCase()
+                              (item) => item.name.toLowerCase() === val.trim().toLowerCase()
                             );
                             if (matched) {
                               setBatchTrackTagCategory(matched.category);
@@ -748,18 +752,18 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                             if (e.key === "Enter") handleBatchAddTrackTag(batchTrackTag);
                             if (e.key === "Escape") setBatchTrackTag("");
                           }}
-                          placeholder="タグ名を入力..."
+                          placeholder={t.albumDetailModal.batchTagPlaceholder}
                           className="text-xs px-2.5 py-1 rounded-lg bg-zinc-900 border border-indigo-500/60 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-400 w-44"
                         />
                         <select
                           value={batchTrackTagCategory}
                           onChange={(e) => setBatchTrackTagCategory(e.target.value as TagCategory)}
                           className="text-xs px-2 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-300 focus:outline-none"
-                          aria-label="一括追加タグの分類"
+                          aria-label={t.albumDetailModal.batchTagCategoryAria}
                         >
                           {tagCategories.map((category) => (
                             <option key={category.value} value={category.value}>
-                              {category.label}
+                              {t.categories[category.value] || category.label}
                             </option>
                           ))}
                         </select>
@@ -770,14 +774,14 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                           className="text-xs px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-white font-medium transition cursor-pointer shadow-sm flex items-center gap-1"
                         >
                           <Plus className="h-3 w-3" />
-                          一括追加
+                          {t.albumDetailModal.batchAddButton}
                         </button>
                       </div>
 
                       {/* Tag Suggestions for Batch */}
                       {batchTagSuggestions.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
-                          <span className="text-zinc-500 text-xs">候補:</span>
+                          <span className="text-zinc-500 text-xs">{t.common.candidates}</span>
                           {batchTagSuggestions.map((s) => (
                             <button
                               key={s.id}
@@ -786,7 +790,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                               className={`px-2 py-0.5 rounded border text-xs transition cursor-pointer hover:brightness-125 flex items-center gap-0.5 ${
                                 tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
                               }`}
-                              title={`選択中の ${selectedTrackIds.size} 曲に「${s.name}」を一括追加`}
+                              title={t.albumDetailModal.batchAddTagSuggestTip(selectedTrackIds.size, s.name)}
                             >
                               <span>+</span>
                               <span className="text-zinc-200">{s.name}</span>
@@ -799,7 +803,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                       {selectedTrackTagsSummary.length > 0 && (
                         <div className="pt-2 border-t border-zinc-800/80">
                           <div className="text-xs text-zinc-400 mb-2 flex items-center gap-1 font-medium">
-                            <span>選択曲に付いているタグ (×で選択曲から一括削除):</span>
+                            <span>{t.albumDetailModal.batchAttachedTagsLabel}</span>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {selectedTrackTagsSummary.map((item) => {
@@ -820,7 +824,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                                     type="button"
                                     onClick={() => handleBatchRemoveTrackTag(item.name)}
                                     className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer ml-0.5 select-none"
-                                    title={`選択したすべての曲から「${item.name}」を一括削除`}
+                                    title={t.albumDetailModal.batchRemoveTagTip(item.name)}
                                   >
                                     <X className="h-3.5 w-3.5" />
                                   </button>
@@ -881,7 +885,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                               type="button"
                               onClick={(e) => handleToggleTrackSelect(track.id, idx, e)}
                               className="p-1 -ml-1 text-zinc-500 hover:text-zinc-200 transition cursor-pointer shrink-0"
-                              title="選択 / 選択解除 (Shift+クリックで範囲選択)"
+                              title={t.albumDetailModal.trackSelectionCheckboxTip}
                             >
                               {isSelected ? (
                                 <CheckSquare className="h-4 w-4 text-indigo-400" />
@@ -925,8 +929,8 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                           >
                             {/* Track tags list */}
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              {track.tags.map((t, tagIdx) => {
-                                const category = getTagCategory(t);
+                              {track.tags.map((tName, tagIdx) => {
+                                const category = getTagCategory(tName);
                                 return (
                                   <span
                                     key={tagIdx}
@@ -935,13 +939,13 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                                     <span
                                       className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}
                                     />
-                                    <span className="select-text cursor-text text-zinc-200">{t}</span>
+                                    <span className="select-text cursor-text text-zinc-200">{tName}</span>
                                     <button
-                                      onClick={() => handleRemoveTrackTag(track.id, t)}
+                                      onClick={() => handleRemoveTrackTag(track.id, tName)}
                                       className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none ml-0.5"
-                                      title="タグを削除"
+                                      title={t.albumDetailModal.removeTagTip}
                                     >
-                                      <X className="h-3 w-3" />
+                                      <X className="h-3.5 w-3.5" />
                                     </button>
                                   </span>
                                 );
@@ -958,7 +962,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                                         const val = e.target.value;
                                         setNewTrackTag(val);
                                         const matched = availableTags.find(
-                                          (t) => t.name.toLowerCase() === val.trim().toLowerCase()
+                                          (item) => item.name.toLowerCase() === val.trim().toLowerCase()
                                         );
                                         if (matched) {
                                           setNewTrackTagCategory(matched.category);
@@ -968,7 +972,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                                         if (e.key === "Enter") handleAddTrackTag(track.id, newTrackTag);
                                         if (e.key === "Escape") setEditingTrackId(null);
                                       }}
-                                      placeholder="曲タグ"
+                                      placeholder={t.albumDetailModal.trackTagPlaceholder}
                                       autoFocus
                                       className="text-xs sm:text-sm px-3 py-1 rounded-full bg-zinc-950 border border-indigo-500/60 text-zinc-100 w-28 sm:w-32 focus:outline-none"
                                     />
@@ -976,11 +980,11 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                                       value={newTrackTagCategory}
                                       onChange={(e) => setNewTrackTagCategory(e.target.value as TagCategory)}
                                       className="text-xs px-1.5 py-1 rounded bg-zinc-950 border border-zinc-700 text-zinc-300 focus:outline-none"
-                                      aria-label="曲タグの分類"
+                                      aria-label={t.albumDetailModal.trackTagCategoryAria}
                                     >
                                       {tagCategories.map((category) => (
                                         <option key={category.value} value={category.value}>
-                                          {category.label}
+                                          {t.categories[category.value] || category.label}
                                         </option>
                                       ))}
                                     </select>
@@ -988,7 +992,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                                       onClick={() => handleAddTrackTag(track.id, newTrackTag)}
                                       className="text-xs sm:text-sm px-3 py-1 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 cursor-pointer font-medium"
                                     >
-                                      追加
+                                      {t.albumDetailModal.addAlbumTagButton}
                                     </button>
                                     <button
                                       onClick={() => {
@@ -997,12 +1001,12 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                                       }}
                                       className="text-zinc-500 hover:text-zinc-300 cursor-pointer p-0.5"
                                     >
-                                      <X className="h-3 w-3" />
+                                      <X className="h-3.5 w-3.5" />
                                     </button>
                                   </div>
                                   {trackTagSuggestions.length > 0 && (
                                     <div className="flex flex-wrap items-center gap-1 mt-0.5 text-xs text-zinc-500">
-                                      <span>候補:</span>
+                                      <span>{t.common.candidates}</span>
                                       {trackTagSuggestions.map((s) => (
                                         <button
                                           key={s.id}
@@ -1010,9 +1014,10 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                                           className={`px-1.5 py-0.5 rounded border text-xs transition cursor-pointer hover:brightness-125 flex items-center gap-0.5 ${
                                             tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
                                           }`}
-                                          title={`タグ「${s.name}」(${
-                                            tagCategories.find((c) => c.value === s.category)?.label || s.category
-                                          }) を追加`}
+                                          title={t.albumDetailModal.addTagSuggestTip(
+                                            s.name,
+                                            t.categories[s.category] || s.category
+                                          )}
                                         >
                                           <span>+</span>
                                           <span className="text-zinc-200">{s.name}</span>
@@ -1029,10 +1034,10 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                                     setNewTrackTagCategory("other");
                                   }}
                                   className="py-1 px-2.5 rounded-md bg-zinc-800/40 text-zinc-400 border border-zinc-700/40 group-hover:bg-indigo-600 group-hover:hover:bg-indigo-500 group-hover:text-white group-hover:border-transparent group-hover:shadow-sm active:scale-98 font-medium text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
-                                  title="曲のタグを編集"
+                                  title={t.albumDetailModal.editTrackTagTip}
                                 >
                                   <Tag className="h-3.5 w-3.5 shrink-0" />
-                                  <span className="text-[11px] whitespace-nowrap">タグ編集</span>
+                                  <span className="text-[11px] whitespace-nowrap">{t.albumDetailModal.editTrackTagButton}</span>
                                 </button>
                               )}
                             </div>
@@ -1041,10 +1046,10 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                               queuedTrackIds.has(track.id) ? (
                                 <span
                                   className="w-28 py-1 rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-xs font-medium select-none flex items-center justify-center gap-1.5 shrink-0"
-                                  title="すでに再生キューに追加されています"
+                                  title={t.albumDetailModal.queuedTip}
                                 >
                                   <Check className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
-                                  <span className="text-[11px] whitespace-nowrap">キュー追加済み</span>
+                                  <span className="text-[11px] whitespace-nowrap">{t.albumDetailModal.queuedLabel}</span>
                                 </span>
                               ) : (
                                 <button
@@ -1053,10 +1058,10 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                                     onQueueTrack(track, activeAlbum);
                                   }}
                                   className="w-28 py-1 rounded-md bg-zinc-800/40 text-zinc-400 border border-zinc-700/40 group-hover:bg-indigo-600 group-hover:hover:bg-indigo-500 group-hover:text-white group-hover:border-transparent group-hover:shadow-sm active:scale-98 font-medium text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
-                                  title="この曲を再生キューに追加"
+                                  title={t.albumDetailModal.queueTrackTip}
                                 >
                                   <ListPlus className="h-3.5 w-3.5 shrink-0" />
-                                  <span className="text-[11px] whitespace-nowrap">キューに追加</span>
+                                  <span className="text-[11px] whitespace-nowrap">{t.common.queue}</span>
                                 </button>
                               )
                             )}

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { TagCategory, TagItem, TrackWithAlbum, categoryDotClasses } from "../types/music";
+import { useTranslation } from "../i18n";
 
 interface TrackListProps {
   tracks: TrackWithAlbum[];
@@ -60,6 +61,7 @@ export const TrackList: React.FC<TrackListProps> = ({
   onToggleTag,
   onEditTrackTags,
 }) => {
+  const { t } = useTranslation();
   const queuedTrackIds = useMemo(() => new Set(queue.map((t) => t.id)), [queue]);
 
   const getTagCategory = (tagName: string): TagCategory =>
@@ -75,7 +77,7 @@ export const TrackList: React.FC<TrackListProps> = ({
     return (
       <div className="flex flex-col items-center justify-center h-64 text-zinc-500 text-xs gap-2">
         <Disc3 className="h-6 w-6 animate-spin text-indigo-400" />
-        <span>曲を検索中...</span>
+        <span>{t.trackList.searchingTracks}</span>
       </div>
     );
   }
@@ -90,17 +92,17 @@ export const TrackList: React.FC<TrackListProps> = ({
         </div>
         <h2 className="text-base font-medium text-zinc-300">
           {hasSearch
-            ? "検索条件に一致する曲がありません"
+            ? t.trackList.noTracksFoundSearch
             : selectedTags.length > 0
-            ? "選択したタグに一致する曲がありません"
-            : "曲が見つかりません"}
+            ? t.trackList.noTracksFoundTags
+            : t.trackList.noTracksFoundEmpty}
         </h2>
         <p className="mt-1 text-xs text-zinc-500 max-w-sm">
           {hasSearch
-            ? "検索キーワードを変更するかクリアしてください。"
+            ? t.trackList.noTracksFoundSearchSub
             : selectedTags.length > 0
-            ? "他のタグを選択するか、タグフィルターを解除してください。"
-            : "上部の「登録」から音楽ファイルを読み込んでください。"}
+            ? t.trackList.noTracksFoundTagsSub
+            : t.trackList.noTracksFoundEmptySub}
         </p>
       </div>
     );
@@ -113,13 +115,13 @@ export const TrackList: React.FC<TrackListProps> = ({
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-zinc-200">
             {hasSearch
-              ? "曲検索結果"
+              ? t.trackList.titleSearchResults
               : selectedTags.length > 0
-              ? "タグ検索結果"
-              : "すべての曲"}
+              ? t.trackList.titleTagResults
+              : t.trackList.titleAllTracks}
           </span>
           <span className="text-xs text-zinc-500 font-mono">
-            ({tracks.length} 曲)
+            {t.trackList.trackCount(tracks.length)}
           </span>
         </div>
 
@@ -128,20 +130,20 @@ export const TrackList: React.FC<TrackListProps> = ({
             <button
               onClick={() => onPlayAll(tracks)}
               className="w-28 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
-              title="すべての曲を再生"
+              title={t.trackList.playAllTip}
             >
               <Play className="h-3.5 w-3.5 fill-current" />
-              再生
+              {t.common.play}
             </button>
           )}
           {onQueueAll && tracks.length > 0 && (
             <button
               onClick={() => onQueueAll(tracks)}
               className="w-28 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
-              title="すべての曲を再生キューに追加"
+              title={t.trackList.queueAllTip}
             >
               <ListPlus className="h-3.5 w-3.5" />
-              キューに追加
+              {t.common.queue}
             </button>
           )}
         </div>
@@ -179,7 +181,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                   <button
                     onClick={() => onPlayTrack(track)}
                     className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 flex items-center justify-center transition cursor-pointer text-white hover:text-indigo-300"
-                    title="この曲を再生"
+                    title={t.trackList.playThisTrackTip}
                   >
                     <Play className="h-4 w-4 fill-current ml-0.5" />
                   </button>
@@ -204,7 +206,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 text-[11px] text-zinc-400 truncate mt-0.5">
-                    <span className="truncate">{track.artist || track.album_artist || "Unknown Artist"}</span>
+                    <span className="truncate">{track.artist || track.album_artist || t.trackList.unknownArtist}</span>
                     <span className="text-zinc-600">•</span>
                     <span className="text-zinc-500 truncate">{track.album_title}</span>
                   </div>
@@ -217,27 +219,27 @@ export const TrackList: React.FC<TrackListProps> = ({
                 onClick={(e) => e.stopPropagation()}
               >
                 {track.tags &&
-                  track.tags.map((t, tIdx) => {
-                    const isTagSelected = selectedTags.includes(t);
-                    const category = getTagCategory(t);
+                  track.tags.map((tName, tIdx) => {
+                    const isTagSelected = selectedTags.includes(tName);
+                    const category = getTagCategory(tName);
                     return (
                       <span
                         key={tIdx}
                         onClick={(e) => {
                           e.stopPropagation();
-                          onToggleTag?.(t);
+                          onToggleTag?.(tName);
                         }}
                         className={`inline-flex items-center gap-1.5 text-[11px] px-1.5 py-0.5 rounded border font-mono truncate max-w-full cursor-pointer hover:brightness-125 transition ${
                           isTagSelected
                             ? tagSelectedColorClasses[category]
                             : tagColorClasses[category]
                         }`}
-                        title={`タグ「${t}」を選択タグに追加/解除`}
+                        title={t.trackList.toggleTagTip(tName)}
                       >
                         <span
                           className={`h-1.5 w-1.5 rounded-full shrink-0 ${categoryDotClasses[category]}`}
                         />
-                        <span className="text-zinc-300 truncate">{t}</span>
+                        <span className="text-zinc-300 truncate">{tName}</span>
                       </span>
                     );
                   })}
@@ -250,10 +252,10 @@ export const TrackList: React.FC<TrackListProps> = ({
                   <button
                     onClick={() => onEditTrackTags(track)}
                     className="py-1 px-2.5 rounded-md bg-zinc-800/40 text-zinc-400 border border-zinc-700/40 group-hover:bg-indigo-600 group-hover:hover:bg-indigo-500 group-hover:text-white group-hover:border-transparent group-hover:shadow-sm active:scale-98 font-medium text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
-                    title="所属アルバムのタグ編集モーダルを開く"
+                    title={t.trackList.editAlbumTagsTip}
                   >
                     <Tag className="h-3.5 w-3.5 shrink-0" />
-                    <span className="text-[11px] whitespace-nowrap">タグ編集</span>
+                    <span className="text-[11px] whitespace-nowrap">{t.common.editTags}</span>
                   </button>
                 )}
 
@@ -261,19 +263,19 @@ export const TrackList: React.FC<TrackListProps> = ({
                 {queuedTrackIds.has(track.id) ? (
                   <span
                     className="w-28 py-1 rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-xs font-medium select-none flex items-center justify-center gap-1.5 shrink-0"
-                    title="すでに再生キューに追加されています"
+                    title={t.trackList.queuedTip}
                   >
                     <Check className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
-                    <span className="text-[11px] whitespace-nowrap">キュー追加済み</span>
+                    <span className="text-[11px] whitespace-nowrap">{t.common.queued}</span>
                   </span>
                 ) : (
                   <button
                     onClick={() => onQueueTrack(track)}
                     className="w-28 py-1 rounded-md bg-zinc-800/40 text-zinc-400 border border-zinc-700/40 group-hover:bg-indigo-600 group-hover:hover:bg-indigo-500 group-hover:text-white group-hover:border-transparent group-hover:shadow-sm active:scale-98 font-medium text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
-                    title="この曲を再生キューに追加"
+                    title={t.trackList.queueTrackTip}
                   >
                     <ListPlus className="h-3.5 w-3.5 shrink-0" />
-                    <span className="text-[11px] whitespace-nowrap">キューに追加</span>
+                    <span className="text-[11px] whitespace-nowrap">{t.common.queue}</span>
                   </button>
                 )}
 

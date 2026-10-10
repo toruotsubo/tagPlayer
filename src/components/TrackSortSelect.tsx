@@ -1,22 +1,12 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { ChevronRight, ChevronDown, Check } from "lucide-react";
 import { TrackSortOrder } from "../types/music";
+import { useTranslation } from "../i18n";
 
 interface TrackSortOption {
   value: TrackSortOrder;
   labels: string[];
 }
-
-const TRACK_SORT_OPTIONS: TrackSortOption[] = [
-  {
-    value: "artist-album-disc-track",
-    labels: ["アーティスト", "アルバムタイトル", "ディスク", "トラック"],
-  },
-  {
-    value: "title",
-    labels: ["曲タイトル"],
-  },
-];
 
 interface TrackSortSelectProps {
   value: TrackSortOrder;
@@ -27,8 +17,28 @@ export const TrackSortSelect: React.FC<TrackSortSelectProps> = ({
   value,
   onChange,
 }) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const sortOptions: TrackSortOption[] = useMemo(
+    () => [
+      {
+        value: "artist-album-disc-track",
+        labels: [
+          t.trackSort.artist,
+          t.trackSort.albumTitle,
+          t.trackSort.disc,
+          t.trackSort.track,
+        ],
+      },
+      {
+        value: "title",
+        labels: [t.trackSort.songTitle],
+      },
+    ],
+    [t]
+  );
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -58,8 +68,8 @@ export const TrackSortSelect: React.FC<TrackSortSelectProps> = ({
   }, [isOpen]);
 
   const currentOption =
-    TRACK_SORT_OPTIONS.find((opt) => opt.value === value) ||
-    TRACK_SORT_OPTIONS[0];
+    sortOptions.find((opt) => opt.value === value) ||
+    sortOptions[0];
 
   const renderSortLabels = (labels: string[]) => (
     <span className="inline-flex items-center gap-1">
@@ -82,7 +92,7 @@ export const TrackSortSelect: React.FC<TrackSortSelectProps> = ({
         className="bg-zinc-900 border border-zinc-700 hover:border-zinc-600 text-zinc-200 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer transition shadow-xs font-medium flex items-center gap-2"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        aria-label="曲の並び順"
+        aria-label={t.trackSort.label}
       >
         {renderSortLabels(currentOption.labels)}
         <ChevronDown
@@ -97,7 +107,7 @@ export const TrackSortSelect: React.FC<TrackSortSelectProps> = ({
           role="listbox"
           className="absolute left-0 mt-1 min-w-full w-max z-50 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
         >
-          {TRACK_SORT_OPTIONS.map((option) => {
+          {sortOptions.map((option) => {
             const isSelected = option.value === value;
             return (
               <button

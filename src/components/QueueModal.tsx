@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { TrackWithAlbum } from "../types/music";
+import { useTranslation } from "../i18n";
 
 export interface QueueModalProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export const QueueModal: React.FC<QueueModalProps> = ({
   onReorderQueue,
   isPlaying = false,
 }) => {
+  const { t } = useTranslation();
   const [isSaving, setIsSaving] = useState(false);
   const [playlistName, setPlaylistName] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -198,13 +200,13 @@ export const QueueModal: React.FC<QueueModalProps> = ({
             </div>
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-zinc-100 shrink-0">再生キュー</h2>
+                <h2 className="text-base font-bold text-zinc-100 shrink-0">{t.queueModal.title}</h2>
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full border border-zinc-700/80 bg-zinc-950/60 text-[10px] font-mono text-zinc-400 shrink-0">
-                  {queue.length} 曲 / {Math.floor(totalDurationSecs / 60)}分
+                  {t.queueModal.queueCountAndDuration(queue.length, Math.floor(totalDurationSecs / 60))}
                 </span>
               </div>
               <p className="text-[11px] text-zinc-400 truncate mt-0.5">
-                現在キューに入っている楽曲の一覧です。ドラッグして並び替えができます。
+                {t.queueModal.description}
               </p>
             </div>
           </div>
@@ -215,25 +217,25 @@ export const QueueModal: React.FC<QueueModalProps> = ({
                 <button
                   onClick={() => setIsSaving(!isSaving)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700/60 bg-zinc-800/60 hover:bg-zinc-800 text-zinc-200 hover:text-indigo-300 transition text-xs font-medium cursor-pointer shadow-xs active:scale-95"
-                  title="キューをプレイリストとして保存"
+                  title={t.queueModal.savePlaylistTip}
                 >
                   <BookmarkPlus className="h-3.5 w-3.5" />
-                  <span>プレイリスト保存</span>
+                  <span>{t.queueModal.savePlaylistButton}</span>
                 </button>
                 <button
                   onClick={onClearQueue}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700/60 bg-zinc-800/60 hover:bg-zinc-800 text-zinc-200 hover:text-red-400 transition text-xs font-medium cursor-pointer shadow-xs active:scale-95"
-                  title="キューをクリア"
+                  title={t.queueModal.clearQueueTip}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  <span>全クリア</span>
+                  <span>{t.queueModal.clearQueueButton}</span>
                 </button>
               </>
             )}
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition cursor-pointer ml-1"
-              title="閉じる"
+              title={t.queueModal.closeTip}
             >
               <X className="h-5 w-5" />
             </button>
@@ -247,14 +249,14 @@ export const QueueModal: React.FC<QueueModalProps> = ({
             className="p-3.5 px-5 bg-zinc-950/80 border-b border-zinc-800 flex flex-col gap-2 shrink-0 animate-in fade-in duration-150"
           >
             <div className="text-xs font-medium text-zinc-300">
-              キューを新しいプレイリストとして保存
+              {t.queueModal.savePrompt}
             </div>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={playlistName}
                 onChange={(e) => setPlaylistName(e.target.value)}
-                placeholder="プレイリスト名を入力..."
+                placeholder={t.queueModal.playlistNamePlaceholder}
                 autoFocus
                 className="flex-1 rounded-lg bg-zinc-900 border border-zinc-700/80 px-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
               />
@@ -263,14 +265,14 @@ export const QueueModal: React.FC<QueueModalProps> = ({
                 disabled={!playlistName.trim()}
                 className="px-4 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-500 disabled:opacity-40 transition cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
               >
-                {saveSuccess ? <Check className="h-3.5 w-3.5" /> : "保存"}
+                {saveSuccess ? <Check className="h-3.5 w-3.5" /> : t.queueModal.saveButton}
               </button>
               <button
                 type="button"
                 onClick={() => setIsSaving(false)}
                 className="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 text-xs transition cursor-pointer"
               >
-                キャンセル
+                {t.queueModal.cancelButton}
               </button>
             </div>
           </form>
@@ -281,9 +283,9 @@ export const QueueModal: React.FC<QueueModalProps> = ({
           {queue.length === 0 ? (
             <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-zinc-500 text-xs">
               <Disc3 className="h-10 w-10 mb-2.5 text-zinc-700" />
-              <span className="text-sm font-medium text-zinc-400">再生キューが空です</span>
+              <span className="text-sm font-medium text-zinc-400">{t.queueModal.emptyQueueTitle}</span>
               <span className="text-xs text-zinc-600 mt-1">
-                曲を再生するか、タグやアルバムからキューに追加してください
+                {t.queueModal.emptyQueueSub}
               </span>
             </div>
           ) : (
@@ -321,7 +323,7 @@ export const QueueModal: React.FC<QueueModalProps> = ({
                   <div className="flex items-center gap-3 truncate flex-1 min-w-0">
                     <div
                       className="p-1 text-zinc-600 group-hover:text-zinc-400 rounded transition shrink-0"
-                      title="ドラッグして順位を入れ替え"
+                      title={t.queueModal.dragHandleTip}
                     >
                       <GripVertical className="h-4 w-4" />
                     </div>
@@ -357,7 +359,7 @@ export const QueueModal: React.FC<QueueModalProps> = ({
                         </span>
                         {isCurrent && isPlaying && (
                           <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-500/20 text-indigo-300 font-medium shrink-0">
-                            再生中
+                            {t.queueModal.nowPlayingBadge}
                           </span>
                         )}
                       </div>
@@ -378,7 +380,7 @@ export const QueueModal: React.FC<QueueModalProps> = ({
                         onRemoveTrack(idx);
                       }}
                       className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-red-400 transition cursor-pointer"
-                      title="キューから削除"
+                      title={t.queueModal.removeTrackTip}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -393,13 +395,13 @@ export const QueueModal: React.FC<QueueModalProps> = ({
         <div className="px-5 py-3 bg-zinc-950/60 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-500 shrink-0">
           <span className="flex items-center gap-1.5">
             <span>💡</span>
-            <span>各曲をドラッグ＆ドロップして並び替え、クリックで即時再生</span>
+            <span>{t.queueModal.footerHint}</span>
           </span>
           <button
             onClick={onClose}
             className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition cursor-pointer active:scale-95 shadow-xs"
           >
-            閉じる
+            {t.queueModal.closeButton}
           </button>
         </div>
       </div>
