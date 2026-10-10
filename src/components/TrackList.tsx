@@ -178,7 +178,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                   {/* Play overlay on thumbnail */}
                   <button
                     onClick={() => onPlayTrack(track)}
-                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition cursor-pointer text-white hover:text-indigo-300"
+                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 flex items-center justify-center transition cursor-pointer text-white hover:text-indigo-300"
                     title="この曲を再生"
                   >
                     <Play className="h-4 w-4 fill-current ml-0.5" />

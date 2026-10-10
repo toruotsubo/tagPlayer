@@ -38,7 +38,7 @@ import {
 import { TagSidebar } from "./components/TagSidebar";
 import { AlbumGrid } from "./components/AlbumGrid";
 import { TrackList } from "./components/TrackList";
-import { QueueDrawer } from "./components/QueueDrawer";
+import { QueueModal } from "./components/QueueModal";
 import { AlbumDetailModal } from "./components/AlbumDetailModal";
 import { AlbumSortSelect } from "./components/AlbumSortSelect";
 import { TrackSortSelect } from "./components/TrackSortSelect";
@@ -819,7 +819,7 @@ function App() {
         <div className="flex items-center">
           <button
             onClick={() => setIsQueueOpen(!isQueueOpen)}
-            className={`flex w-[calc(18rem-1rem)] items-center justify-between rounded-lg px-3.5 py-1.5 text-xs font-medium text-white transition active:scale-95 cursor-pointer shadow-sm ${
+            className={`flex w-[calc(18rem-1rem)] items-center justify-between rounded-lg px-3.5 py-2 text-xs font-medium text-white transition active:scale-95 cursor-pointer shadow-sm ${
               isQueueOpen
                 ? "bg-indigo-500 ring-1 ring-indigo-300/40"
                 : "bg-indigo-600/90 hover:bg-indigo-500"
@@ -846,7 +846,7 @@ function App() {
           <button
             onClick={handleOpenDirectory}
             disabled={loading}
-            className="flex items-center gap-2 rounded-lg bg-indigo-600/90 px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-500 active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
+            className="flex items-center gap-2 rounded-lg bg-indigo-600/90 px-3.5 py-2 text-xs font-medium text-white transition hover:bg-indigo-500 active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
           >
             <DatabasePlus className="h-3.5 w-3.5" />
             登録
@@ -873,9 +873,9 @@ function App() {
         />
 
         {/* Content Area */}
-        <main className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-zinc-900/20 to-zinc-950 flex flex-col gap-4">
-          {/* View Mode Switcher & Filter Info */}
-          <div className="flex items-center justify-between pb-3 border-b border-zinc-800/60 gap-4 flex-wrap">
+        <main className="flex-1 overflow-y-auto bg-gradient-to-b from-zinc-900/20 to-zinc-950 flex flex-col">
+          {/* View Mode Switcher & Filter Info (Sticky Header) */}
+          <div className="sticky top-0 z-10 px-6 py-3 border-b border-zinc-800/80 bg-zinc-950/85 backdrop-blur-md flex items-center justify-between gap-4 flex-wrap shadow-xs">
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-2">
                 <button
@@ -1033,37 +1033,39 @@ function App() {
             )}
           </div>
 
-          {viewMode === "albums" ? (
-            <AlbumGrid
-              albums={sortedAlbums}
-              searchQuery={albumSearchQuery}
-              selectedTags={selectedTags}
-              availableTags={library.tags}
-              currentPlayingTrackId={currentTrack?.id}
-              isPlaying={isPlaying}
-              onOpenAlbumModal={handleOpenAlbumModal}
-              onPlayAlbum={handlePlayAlbum}
-              onQueueAlbum={handleQueueAlbum}
-              onToggleTag={handleToggleTag}
-            />
-          ) : (
-            <TrackList
-              tracks={sortedTagTracks}
-              searchQuery={trackSearchQuery}
-              selectedTags={selectedTags}
-              availableTags={library.tags}
-              queue={queue}
-              loading={loadingTagTracks}
-              currentPlayingTrackId={currentTrack?.id}
-              isPlaying={isPlaying}
-              onPlayTrack={handlePlaySingleTrack}
-              onQueueTrack={handleQueueSingleTrack}
-              onPlayAll={handlePlayAllTracks}
-              onQueueAll={handleQueueAllTracks}
-              onToggleTag={handleToggleTag}
-              onEditTrackTags={handleOpenTrackTagEdit}
-            />
-          )}
+          <div className="p-6 flex-1 flex flex-col gap-4">
+            {viewMode === "albums" ? (
+              <AlbumGrid
+                albums={sortedAlbums}
+                searchQuery={albumSearchQuery}
+                selectedTags={selectedTags}
+                availableTags={library.tags}
+                currentPlayingTrackId={currentTrack?.id}
+                isPlaying={isPlaying}
+                onOpenAlbumModal={handleOpenAlbumModal}
+                onPlayAlbum={handlePlayAlbum}
+                onQueueAlbum={handleQueueAlbum}
+                onToggleTag={handleToggleTag}
+              />
+            ) : (
+              <TrackList
+                tracks={sortedTagTracks}
+                searchQuery={trackSearchQuery}
+                selectedTags={selectedTags}
+                availableTags={library.tags}
+                queue={queue}
+                loading={loadingTagTracks}
+                currentPlayingTrackId={currentTrack?.id}
+                isPlaying={isPlaying}
+                onPlayTrack={handlePlaySingleTrack}
+                onQueueTrack={handleQueueSingleTrack}
+                onPlayAll={handlePlayAllTracks}
+                onQueueAll={handleQueueAllTracks}
+                onToggleTag={handleToggleTag}
+                onEditTrackTags={handleOpenTrackTagEdit}
+              />
+            )}
+          </div>
         </main>
       </div>
 
@@ -1098,8 +1100,8 @@ function App() {
         }}
       />
 
-      {/* Playback Queue Drawer */}
-      <QueueDrawer
+      {/* Playback Queue Modal */}
+      <QueueModal
         isOpen={isQueueOpen}
         onClose={() => setIsQueueOpen(false)}
         queue={queue}
