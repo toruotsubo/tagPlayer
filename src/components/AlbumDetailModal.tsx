@@ -418,8 +418,18 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
       .slice(0, 5);
   }, [editingTrackId, tracks, availableTags, newTrackTag]);
 
-  const getTagCategory = (tagName: string): TagCategory =>
-    availableTags.find((tag) => tag.name.toLowerCase() === tagName.toLowerCase())?.category ?? "other";
+  const getTagCategory = (tagName: string): TagCategory => {
+    if (
+      activeAlbum?.artist &&
+      tagName.trim().toLowerCase() === activeAlbum.artist.trim().toLowerCase()
+    ) {
+      return "artist";
+    }
+    return (
+      availableTags.find((tag) => tag.name.toLowerCase() === tagName.toLowerCase())
+        ?.category ?? "other"
+    );
+  };
 
   const formatDuration = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -730,8 +740,178 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
           </div>
         </div>
 
+        {/* Batch Selection & Editing Toolbar (スクロール領域外に固定) */}
+        {!loadingTracks && sortedTracks.length > 0 && (
+          <div className="border-b border-zinc-800/80 bg-zinc-900/95 px-4 py-2.5 space-y-2 shrink-0 z-20 shadow-xs">
+            {/* Selection Toolbar Header */}
+            <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-zinc-950/60 border border-zinc-800/80 text-xs">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleToggleSelectAll}
+                  className="flex items-center gap-2 text-zinc-300 hover:text-white transition cursor-pointer select-none"
+                  title={
+                    selectedTrackIds.size === sortedTracks.length
+                      ? t.albumDetailModal.deselectAllTip
+                      : t.albumDetailModal.selectAllTip
+                  }
+                >
+                  {selectedTrackIds.size === sortedTracks.length && sortedTracks.length > 0 ? (
+                    <CheckSquare className="h-4 w-4 text-indigo-400" />
+                  ) : selectedTrackIds.size > 0 ? (
+                    <MinusSquare className="h-4 w-4 text-indigo-400" />
+                  ) : (
+                    <Square className="h-4 w-4 text-zinc-500 hover:text-zinc-400" />
+                  )}
+                  <span className="font-medium">
+                    {selectedTrackIds.size === sortedTracks.length && sortedTracks.length > 0
+                      ? t.albumDetailModal.deselectAllButton
+                      : t.albumDetailModal.selectAllButton}
+                  </span>
+                </button>
+
+                {selectedTrackIds.size > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-medium">
+                    {t.albumDetailModal.selectedTracksCount(selectedTrackIds.size, sortedTracks.length)}
+                  </span>
+                )}
+              </div>
+
+              {selectedTrackIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedTrackIds(new Set());
+                    setLastSelectedTrackIndex(null);
+                  }}
+                  className="text-[11px] text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
+                >
+                  {t.albumDetailModal.deselectButton}
+                </button>
+              )}
+            </div>
+
+            {/* Batch Tag Editing Panel */}
+            {selectedTrackIds.size > 0 && (
+              <div className="p-3.5 rounded-xl bg-zinc-950/90 border border-indigo-500/40 shadow-xl space-y-3 animate-in fade-in duration-150 max-h-[35vh] overflow-y-auto">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300">
+                    <Tag className="h-3.5 w-3.5" />
+                    <span>{t.albumDetailModal.batchEditTitle(selectedTrackIds.size)}</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-500 hidden sm:inline">
+                    {t.albumDetailModal.batchRangeHint}
+                  </span>
+                </div>
+
+                {/* Batch Tag Add Inputs */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={batchTrackTag}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBatchTrackTag(val);
+                      const matched = availableTags.find(
+                        (item) => item.name.toLowerCase() === val.trim().toLowerCase()
+                      );
+                      if (matched) {
+                        setBatchTrackTagCategory(matched.category);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleBatchAddTrackTag(batchTrackTag);
+                      if (e.key === "Escape") setBatchTrackTag("");
+                    }}
+                    placeholder={t.albumDetailModal.batchTagPlaceholder}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-zinc-900 border border-indigo-500/60 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-400 w-44"
+                  />
+                  <select
+                    value={batchTrackTagCategory}
+                    onChange={(e) => setBatchTrackTagCategory(e.target.value as TagCategory)}
+                    className="text-xs px-2 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-300 focus:outline-none"
+                    aria-label={t.albumDetailModal.batchTagCategoryAria}
+                  >
+                    {tagCategories.map((category) => (
+                      <option key={category.value} value={category.value}>
+                        {t.categories[category.value] || category.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!batchTrackTag.trim()}
+                    onClick={() => handleBatchAddTrackTag(batchTrackTag)}
+                    className="text-xs px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-white font-medium transition cursor-pointer shadow-sm flex items-center gap-1"
+                  >
+                    <Plus className="h-3 w-3" />
+                    {t.albumDetailModal.batchAddButton}
+                  </button>
+                </div>
+
+                {/* Tag Suggestions for Batch */}
+                {batchTagSuggestions.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
+                    <span className="text-zinc-500 text-xs">{t.common.candidates}</span>
+                    {batchTagSuggestions.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => handleBatchAddTrackTag(s.name, s.category)}
+                        className={`px-2 py-0.5 rounded border text-xs transition cursor-pointer hover:brightness-125 flex items-center gap-0.5 ${
+                          tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
+                        }`}
+                        title={t.albumDetailModal.batchAddTagSuggestTip(selectedTrackIds.size, s.name)}
+                      >
+                        <span>+</span>
+                        <span className="text-zinc-200">{s.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Existing Tags in Selected Tracks (with batch remove) */}
+                {selectedTrackTagsSummary.length > 0 && (
+                  <div className="pt-2 border-t border-zinc-800/80">
+                    <div className="text-xs text-zinc-400 mb-2 flex items-center gap-1 font-medium">
+                      <span>{t.albumDetailModal.batchAttachedTagsLabel}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto pr-1">
+                      {selectedTrackTagsSummary.map((item) => {
+                        const category = getTagCategory(item.name);
+                        return (
+                          <span
+                            key={item.name}
+                            className={`inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-3 pr-2.5 py-1 rounded-full border select-text cursor-text ${tagColorClasses[category]}`}
+                          >
+                            <span
+                              className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}
+                            />
+                            <span className="select-text cursor-text text-zinc-200">{item.name}</span>
+                            <span className="text-xs opacity-70 font-mono select-none">
+                              ({item.count}/{selectedTrackIds.size})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleBatchRemoveTrackTag(item.name)}
+                              className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer ml-0.5 select-none"
+                              title={t.albumDetailModal.batchRemoveTagTip(item.name)}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Tracks List */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto">
           {loadingTracks ? (
             <div className="py-12 text-center text-xs text-zinc-500">{t.albumDetailModal.loadingTracks}</div>
           ) : sortedTracks.length === 0 ? (
@@ -741,177 +921,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
             const hasMultipleDiscs = uniqueDiscs.length > 1;
 
             return (
-              <div className="flex flex-col gap-3">
-                {/* Batch Selection & Editing Toolbar */}
-                <div className="space-y-2">
-                  {/* Selection Toolbar Header */}
-                  <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-950/60 border border-zinc-800/80 text-xs">
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={handleToggleSelectAll}
-                        className="flex items-center gap-2 text-zinc-300 hover:text-white transition cursor-pointer select-none"
-                        title={
-                          selectedTrackIds.size === sortedTracks.length
-                            ? t.albumDetailModal.deselectAllTip
-                            : t.albumDetailModal.selectAllTip
-                        }
-                      >
-                        {selectedTrackIds.size === sortedTracks.length && sortedTracks.length > 0 ? (
-                          <CheckSquare className="h-4 w-4 text-indigo-400" />
-                        ) : selectedTrackIds.size > 0 ? (
-                          <MinusSquare className="h-4 w-4 text-indigo-400" />
-                        ) : (
-                          <Square className="h-4 w-4 text-zinc-500 hover:text-zinc-400" />
-                        )}
-                        <span className="font-medium">
-                          {selectedTrackIds.size === sortedTracks.length && sortedTracks.length > 0
-                            ? t.albumDetailModal.deselectAllButton
-                            : t.albumDetailModal.selectAllButton}
-                        </span>
-                      </button>
-
-                      {selectedTrackIds.size > 0 && (
-                        <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-medium">
-                          {t.albumDetailModal.selectedTracksCount(selectedTrackIds.size, sortedTracks.length)}
-                        </span>
-                      )}
-                    </div>
-
-                    {selectedTrackIds.size > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedTrackIds(new Set());
-                          setLastSelectedTrackIndex(null);
-                        }}
-                        className="text-[11px] text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
-                      >
-                        {t.albumDetailModal.deselectButton}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Batch Tag Editing Panel */}
-                  {selectedTrackIds.size > 0 && (
-                    <div className="p-3.5 rounded-xl bg-zinc-950/90 border border-indigo-500/40 shadow-xl space-y-3 animate-in fade-in duration-150">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300">
-                          <Tag className="h-3.5 w-3.5" />
-                          <span>{t.albumDetailModal.batchEditTitle(selectedTrackIds.size)}</span>
-                        </div>
-                        <span className="text-[10px] text-zinc-500 hidden sm:inline">
-                          {t.albumDetailModal.batchRangeHint}
-                        </span>
-                      </div>
-
-                      {/* Batch Tag Add Inputs */}
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <input
-                          type="text"
-                          value={batchTrackTag}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setBatchTrackTag(val);
-                            const matched = availableTags.find(
-                              (item) => item.name.toLowerCase() === val.trim().toLowerCase()
-                            );
-                            if (matched) {
-                              setBatchTrackTagCategory(matched.category);
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") handleBatchAddTrackTag(batchTrackTag);
-                            if (e.key === "Escape") setBatchTrackTag("");
-                          }}
-                          placeholder={t.albumDetailModal.batchTagPlaceholder}
-                          className="text-xs px-2.5 py-1 rounded-lg bg-zinc-900 border border-indigo-500/60 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-400 w-44"
-                        />
-                        <select
-                          value={batchTrackTagCategory}
-                          onChange={(e) => setBatchTrackTagCategory(e.target.value as TagCategory)}
-                          className="text-xs px-2 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-300 focus:outline-none"
-                          aria-label={t.albumDetailModal.batchTagCategoryAria}
-                        >
-                          {tagCategories.map((category) => (
-                            <option key={category.value} value={category.value}>
-                              {t.categories[category.value] || category.label}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          disabled={!batchTrackTag.trim()}
-                          onClick={() => handleBatchAddTrackTag(batchTrackTag)}
-                          className="text-xs px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-white font-medium transition cursor-pointer shadow-sm flex items-center gap-1"
-                        >
-                          <Plus className="h-3 w-3" />
-                          {t.albumDetailModal.batchAddButton}
-                        </button>
-                      </div>
-
-                      {/* Tag Suggestions for Batch */}
-                      {batchTagSuggestions.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
-                          <span className="text-zinc-500 text-xs">{t.common.candidates}</span>
-                          {batchTagSuggestions.map((s) => (
-                            <button
-                              key={s.id}
-                              type="button"
-                              onClick={() => handleBatchAddTrackTag(s.name, s.category)}
-                              className={`px-2 py-0.5 rounded border text-xs transition cursor-pointer hover:brightness-125 flex items-center gap-0.5 ${
-                                tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
-                              }`}
-                              title={t.albumDetailModal.batchAddTagSuggestTip(selectedTrackIds.size, s.name)}
-                            >
-                              <span>+</span>
-                              <span className="text-zinc-200">{s.name}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Existing Tags in Selected Tracks (with batch remove) */}
-                      {selectedTrackTagsSummary.length > 0 && (
-                        <div className="pt-2 border-t border-zinc-800/80">
-                          <div className="text-xs text-zinc-400 mb-2 flex items-center gap-1 font-medium">
-                            <span>{t.albumDetailModal.batchAttachedTagsLabel}</span>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {selectedTrackTagsSummary.map((item) => {
-                              const category = getTagCategory(item.name);
-                              return (
-                                <span
-                                  key={item.name}
-                                  className={`inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-3 pr-2.5 py-1 rounded-full border select-text cursor-text ${tagColorClasses[category]}`}
-                                >
-                                  <span
-                                    className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}
-                                  />
-                                  <span className="select-text cursor-text text-zinc-200">{item.name}</span>
-                                  <span className="text-xs opacity-70 font-mono select-none">
-                                    ({item.count}/{selectedTrackIds.size})
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleBatchRemoveTrackTag(item.name)}
-                                    className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer ml-0.5 select-none"
-                                    title={t.albumDetailModal.batchRemoveTagTip(item.name)}
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </button>
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Tracks List Items */}
-                <div className="flex flex-col divide-y divide-zinc-800/40">
+              <div className="flex flex-col divide-y divide-zinc-800/40 px-4 py-2 pb-4">
                   {sortedTracks.map((track, idx) => {
                     const currentDisc = track.disc_number ?? 1;
                     const prevDisc = idx > 0 ? (sortedTracks[idx - 1].disc_number ?? 1) : null;
@@ -921,7 +931,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                     return (
                       <React.Fragment key={track.id}>
                         {showDiscHeader && (
-                          <div className="flex items-center gap-2 pt-3.5 pb-1 px-3 text-[11px] font-semibold text-indigo-400 bg-zinc-900/80 border-b border-zinc-800/80 sticky top-0 backdrop-blur-sm z-10">
+                          <div className="flex items-center gap-2 py-2 px-7 -mx-4 text-[11px] font-semibold text-indigo-400 bg-zinc-900/95 border-b border-zinc-800 sticky top-0 backdrop-blur-md z-10 shadow-xs">
                             <Disc3 className="h-3.5 w-3.5" />
                             <span>Disc {currentDisc}</span>
                           </div>
@@ -1147,7 +1157,6 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                     );
                   })}
                 </div>
-              </div>
             );
           })()}
         </div>

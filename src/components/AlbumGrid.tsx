@@ -67,9 +67,18 @@ export const getAlbumDisplayTags = (
     (album.primary_tags || []).map((t) => t.toLowerCase())
   );
 
-  const getCategory = (tagName: string): TagCategory =>
-    availableTags.find((t) => t.name.toLowerCase() === tagName.toLowerCase())
-      ?.category ?? "other";
+  const getCategory = (tagName: string): TagCategory => {
+    if (
+      album.artist &&
+      tagName.trim().toLowerCase() === album.artist.trim().toLowerCase()
+    ) {
+      return "artist";
+    }
+    return (
+      availableTags.find((t) => t.name.toLowerCase() === tagName.toLowerCase())
+        ?.category ?? "other"
+    );
+  };
 
   let artistPrimaryTag: string | null = null;
   let genrePrimaryTag: string | null = null;
@@ -79,9 +88,20 @@ export const getAlbumDisplayTags = (
   for (const tag of album.tags) {
     const isPrimary = primarySet.has(tag.toLowerCase());
     const category = getCategory(tag);
+    const isArtistMatch = Boolean(
+      album.artist &&
+        tag.trim().toLowerCase() === album.artist.trim().toLowerCase()
+    );
 
-    if (isPrimary && category === "artist" && !artistPrimaryTag) {
-      artistPrimaryTag = tag;
+    if (
+      (isPrimary && category === "artist") ||
+      (isPrimary && isArtistMatch)
+    ) {
+      if (!artistPrimaryTag) {
+        artistPrimaryTag = tag;
+      } else {
+        nonPrimaryTags.push(tag);
+      }
     } else if (isPrimary && category === "genre" && !genrePrimaryTag) {
       genrePrimaryTag = tag;
     } else if (
@@ -92,6 +112,16 @@ export const getAlbumDisplayTags = (
       releaseYearPrimaryTag = tag;
     } else {
       nonPrimaryTags.push(tag);
+    }
+  }
+
+  // もし artistPrimaryTag が未設定で、album.artist に一致するタグがアルバムタグにあればフォールバック
+  if (!artistPrimaryTag && album.artist) {
+    const matchedIdx = nonPrimaryTags.findIndex(
+      (t) => t.trim().toLowerCase() === album.artist.trim().toLowerCase()
+    );
+    if (matchedIdx !== -1) {
+      artistPrimaryTag = nonPrimaryTags.splice(matchedIdx, 1)[0];
     }
   }
 
@@ -285,7 +315,12 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                 {artistPrimaryTag && (
                   <div className="flex items-center">
                     {(() => {
-                      const category = getTagCategory(artistPrimaryTag);
+                      const category =
+                        album.artist &&
+                        artistPrimaryTag.trim().toLowerCase() ===
+                          album.artist.trim().toLowerCase()
+                          ? "artist"
+                          : getTagCategory(artistPrimaryTag);
                       const isTagSelected = selectedTags.includes(artistPrimaryTag);
                       return (
                         <span
@@ -312,7 +347,12 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                 {secondRowTags.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1 mt-0.5">
                     {secondRowTags.map((tag, idx) => {
-                      const category = getTagCategory(tag);
+                      const category =
+                        album.artist &&
+                        tag.trim().toLowerCase() ===
+                          album.artist.trim().toLowerCase()
+                          ? "artist"
+                          : getTagCategory(tag);
                       const isTagSelected = selectedTags.includes(tag);
                       const isPrimary = primarySet.has(tag.toLowerCase());
                       return (

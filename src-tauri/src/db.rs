@@ -114,6 +114,15 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         [],
     );
 
+    // アルバムアーティストタグのカテゴリを最優先（albums.artist に一致するタグは artist に復元・保護）
+    let _ = conn.execute(
+        "UPDATE tags SET category = 'artist'
+         WHERE name IN (
+             SELECT DISTINCT artist FROM albums WHERE artist IS NOT NULL AND artist != ''
+         )",
+        [],
+    );
+
     Ok(())
 }
 
@@ -163,7 +172,17 @@ pub fn get_or_create_tag_with_category(
     };
     conn.execute(
         "INSERT INTO tags (name, category) VALUES (?1, ?2)
-         ON CONFLICT(name) DO UPDATE SET category = excluded.category",
+         ON CONFLICT(name) DO UPDATE SET category = CASE
+             -- 既に artist であるタグ、または新しく artist として登録されるタグは最優先
+             WHEN tags.category = 'artist' THEN 'artist'
+             WHEN excluded.category = 'artist' THEN 'artist'
+             -- genre, release_year の保護
+             WHEN tags.category IN ('genre', 'release_year') AND excluded.category IN ('composer', 'other') THEN tags.category
+             WHEN excluded.category IN ('genre', 'release_year') THEN excluded.category
+             -- composer やその他
+             WHEN excluded.category != 'other' THEN excluded.category
+             ELSE tags.category
+         END",
         params![trimmed, normalized_category],
     )?;
     let tag_id: i64 = conn.query_row(
