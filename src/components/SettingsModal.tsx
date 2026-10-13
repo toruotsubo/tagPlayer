@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Settings, X, Globe, Check } from "lucide-react";
+import { Settings, X, Globe, Check, Type } from "lucide-react";
 import { useTranslation, LanguageSetting } from "../i18n";
+import { getStoredTextSize, applyTextSize, TextSizeSetting } from "../hooks/useTextSize";
 
 export interface SettingsModalProps {
   isOpen: boolean;
@@ -13,11 +14,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const { t, languageSetting, setLanguageSetting, detectedLanguage } = useTranslation();
   const [selectedSetting, setSelectedSetting] = useState<LanguageSetting>(languageSetting);
+  const [selectedTextSize, setSelectedTextSize] = useState<TextSizeSetting>(getStoredTextSize);
 
   // モーダルが開くたびに現在の設定を反映
   useEffect(() => {
     if (isOpen) {
       setSelectedSetting(languageSetting);
+      setSelectedTextSize(getStoredTextSize());
     }
   }, [isOpen, languageSetting]);
 
@@ -37,6 +40,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSave = () => {
     setLanguageSetting(selectedSetting);
+    applyTextSize(selectedTextSize);
     onClose();
   };
 
@@ -59,6 +63,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     {
       value: "ja",
       label: t.settings.languageJa,
+    },
+  ];
+
+  const textSizeOptions: {
+    value: TextSizeSetting;
+    label: string;
+    subLabel: string;
+  }[] = [
+    {
+      value: "100%",
+      label: "100%",
+      subLabel: t.settings.textSizeStandard,
+    },
+    {
+      value: "110%",
+      label: "110%",
+      subLabel: t.settings.textSizeLarge,
     },
   ];
 
@@ -93,6 +114,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Content */}
         <div className="p-5 flex flex-col gap-4">
+          {/* 言語設定 */}
           <div>
             <label className="text-xs font-semibold text-zinc-300 flex items-center gap-2 mb-2.5">
               <Globe className="h-4 w-4 text-indigo-400" />
@@ -120,6 +142,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           {opt.subLabel}
                         </span>
                       )}
+                    </div>
+                    {isSelected && (
+                      <div className="h-5 w-5 rounded-full bg-indigo-600 flex items-center justify-center text-white shrink-0">
+                        <Check className="h-3 w-3 stroke-[2.5]" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 文字サイズ設定 */}
+          <div className="pt-2 border-t border-zinc-800/80">
+            <label className="text-xs font-semibold text-zinc-300 flex items-center gap-2 mb-2.5">
+              <Type className="h-4 w-4 text-indigo-400" />
+              <span>{t.settings.textSize}</span>
+            </label>
+
+            <div className="grid grid-cols-2 gap-2">
+              {textSizeOptions.map((opt) => {
+                const isSelected = selectedTextSize === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setSelectedTextSize(opt.value)}
+                    className={`flex items-center justify-between p-3 rounded-xl border text-left transition cursor-pointer ${
+                      isSelected
+                        ? "bg-indigo-600/15 border-indigo-500/60 text-zinc-100 shadow-xs"
+                        : "bg-zinc-950/50 border-zinc-800/80 hover:bg-zinc-800/50 text-zinc-300"
+                    }`}
+                  >
+                    <div className="flex flex-col">
+                      <span className={`font-semibold tracking-wide ${opt.value === "110%" ? "text-sm" : "text-xs"}`}>
+                        {opt.label}
+                      </span>
+                      <span className="text-[11px] text-zinc-400 mt-0.5">
+                        {opt.subLabel}
+                      </span>
                     </div>
                     {isSelected && (
                       <div className="h-5 w-5 rounded-full bg-indigo-600 flex items-center justify-center text-white shrink-0">

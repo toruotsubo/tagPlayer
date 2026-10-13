@@ -236,6 +236,9 @@ export const en: Translations = {
     languageJa: "Japanese",
     languageEn: "English",
     languageAutoHint: (detected: string) => `Uses system language (${detected})`,
+    textSize: "Text Size",
+    textSizeStandard: "Standard",
+    textSizeLarge: "Large",
   },
 };
 

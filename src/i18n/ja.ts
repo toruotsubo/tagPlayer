@@ -234,6 +234,9 @@ export const ja: Translations = {
     languageJa: "日本語",
     languageEn: "英語",
     languageAutoHint: (detected: string) => `システム言語 (${detected}) を使用`,
+    textSize: "文字サイズ",
+    textSizeStandard: "標準",
+    textSizeLarge: "拡大",
   },
 };
 

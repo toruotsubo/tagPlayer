@@ -218,6 +218,9 @@ export interface Translations {
     languageJa: string;
     languageEn: string;
     languageAutoHint: (detected: string) => string;
+    textSize: string;
+    textSizeStandard: string;
+    textSizeLarge: string;
   };
 }
 
