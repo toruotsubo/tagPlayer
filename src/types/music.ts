@@ -46,6 +46,7 @@ export interface Album {
   cover_url?: string;
   track_count: number;
   tags: string[];
+  primary_tags?: string[];
 }
 
 export interface LibraryData {

@@ -5,6 +5,7 @@ import {
   Tag,
   Play,
   ListPlus,
+  Star,
 } from "lucide-react";
 import { Album, TagCategory, TagItem, Track, categoryDotClasses } from "../types/music";
 import { invoke } from "@tauri-apps/api/core";
@@ -48,10 +49,68 @@ export const tagSelectedColorClasses: Record<TagCategory, string> = {
   other: "bg-indigo-500/30 text-indigo-300 border-indigo-500/30",
 };
 
+export interface AlbumDisplayTags {
+  artistPrimaryTag: string | null;
+  secondRowTags: string[];
+}
+
 /**
- * アルバムカード等のタグ表示順を整える。
- * 楽曲データから生成された「ジャンル」「リリース年」をそれぞれ1番目、2番目とし、
- * 以降は現状同様のテキストソート順とする。
+ * アルバムタグの並び順:
+ * アルバムタイトル直下にアーティストPrimaryタグ、
+ * 次の行にジャンルPrimaryタグ、リリース年Primaryタグ、以降非Primaryタグテキスト昇順
+ */
+export const getAlbumDisplayTags = (
+  album: Album,
+  availableTags: TagItem[]
+): AlbumDisplayTags => {
+  const primarySet = new Set(
+    (album.primary_tags || []).map((t) => t.toLowerCase())
+  );
+
+  const getCategory = (tagName: string): TagCategory =>
+    availableTags.find((t) => t.name.toLowerCase() === tagName.toLowerCase())
+      ?.category ?? "other";
+
+  let artistPrimaryTag: string | null = null;
+  let genrePrimaryTag: string | null = null;
+  let releaseYearPrimaryTag: string | null = null;
+  const nonPrimaryTags: string[] = [];
+
+  for (const tag of album.tags) {
+    const isPrimary = primarySet.has(tag.toLowerCase());
+    const category = getCategory(tag);
+
+    if (isPrimary && category === "artist" && !artistPrimaryTag) {
+      artistPrimaryTag = tag;
+    } else if (isPrimary && category === "genre" && !genrePrimaryTag) {
+      genrePrimaryTag = tag;
+    } else if (
+      isPrimary &&
+      category === "release_year" &&
+      !releaseYearPrimaryTag
+    ) {
+      releaseYearPrimaryTag = tag;
+    } else {
+      nonPrimaryTags.push(tag);
+    }
+  }
+
+  // 非Primaryタグはテキスト昇順
+  nonPrimaryTags.sort((a, b) => a.localeCompare(b));
+
+  const secondRowTags: string[] = [];
+  if (genrePrimaryTag) secondRowTags.push(genrePrimaryTag);
+  if (releaseYearPrimaryTag) secondRowTags.push(releaseYearPrimaryTag);
+  secondRowTags.push(...nonPrimaryTags);
+
+  return {
+    artistPrimaryTag,
+    secondRowTags,
+  };
+};
+
+/**
+ * 後方互換用: 2行目タグ一覧を返す
  */
 export const sortAlbumTags = (tags: string[], album: Album): string[] => {
   const nonArtistTags = tags.filter(
@@ -159,10 +218,8 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
         {albums.map((album) => {
           const coverSrc = album.cover_url ? convertFileSrc(album.cover_url) : null;
-          const autoArtistTag =
-            album.tags.find((t) => t.toLowerCase() === album.artist.toLowerCase()) ||
-            (album.artist ? album.artist : null);
-          const otherTags = sortAlbumTags(album.tags, album);
+          const { artistPrimaryTag, secondRowTags } = getAlbumDisplayTags(album, availableTags);
+          const primarySet = new Set((album.primary_tags || []).map((t) => t.toLowerCase()));
 
           return (
             <div
@@ -224,43 +281,40 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                   {album.title}
                 </span>
 
-                {/* Auto Artist Tag */}
-                {autoArtistTag && (
+                {/* Artist Primary Tag (アルバムタイトル直下) */}
+                {artistPrimaryTag && (
                   <div className="flex items-center">
                     {(() => {
-                      const category = getTagCategory(autoArtistTag);
-                      const isTagSelected = selectedTags.includes(autoArtistTag);
+                      const category = getTagCategory(artistPrimaryTag);
+                      const isTagSelected = selectedTags.includes(artistPrimaryTag);
                       return (
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
-                            onToggleTag?.(autoArtistTag);
+                            onToggleTag?.(artistPrimaryTag);
                           }}
-                          className={`inline-flex items-center gap-1.5 text-[11px] px-1.5 py-0.5 rounded border font-mono truncate max-w-full cursor-pointer hover:brightness-125 transition ${
+                          className={`inline-flex items-center gap-1.5 text-[11px] px-1.5 py-0.5 rounded border font-mono truncate max-w-full cursor-pointer hover:brightness-125 transition font-medium shadow-sm ${
                             isTagSelected
                               ? tagSelectedColorClasses[category] || tagSelectedColorClasses.artist
                               : tagColorClasses[category] || tagColorClasses.artist
                           }`}
-                          title={t.albumGrid.toggleTagTip(autoArtistTag)}
+                          title={t.albumGrid.toggleTagTip(artistPrimaryTag)}
                         >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-                              categoryDotClasses[category] || categoryDotClasses.artist
-                            }`}
-                          />
-                          <span className="text-zinc-300 truncate">{autoArtistTag}</span>
+                          <Star className="h-2.5 w-2.5 fill-current shrink-0 text-emerald-400" />
+                          <span className="text-zinc-200 truncate">{artistPrimaryTag}</span>
                         </span>
                       );
                     })()}
                   </div>
                 )}
 
-                {/* Tags preview */}
-                {otherTags.length > 0 && (
+                {/* Next row tags (ジャンルPrimary、リリース年Primary、以降非Primaryテキスト昇順) */}
+                {secondRowTags.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                    {otherTags.map((tag, idx) => {
+                    {secondRowTags.map((tag, idx) => {
                       const category = getTagCategory(tag);
                       const isTagSelected = selectedTags.includes(tag);
+                      const isPrimary = primarySet.has(tag.toLowerCase());
                       return (
                         <span
                           key={idx}
@@ -269,15 +323,29 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                             onToggleTag?.(tag);
                           }}
                           className={`inline-flex items-center gap-1.5 text-[11px] px-1.5 py-0.5 rounded border font-mono truncate max-w-full cursor-pointer hover:brightness-125 transition ${
+                            isPrimary ? "font-medium shadow-sm" : ""
+                          } ${
                             isTagSelected
                               ? tagSelectedColorClasses[category]
                               : tagColorClasses[category]
                           }`}
                           title={t.albumGrid.toggleTagTip(tag)}
                         >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full shrink-0 ${categoryDotClasses[category]}`}
-                          />
+                          {isPrimary ? (
+                            <Star
+                              className={`h-2.5 w-2.5 fill-current shrink-0 ${
+                                category === "genre"
+                                  ? "text-amber-400"
+                                  : category === "release_year"
+                                  ? "text-sky-400"
+                                  : "text-indigo-400"
+                              }`}
+                            />
+                          ) : (
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full shrink-0 ${categoryDotClasses[category]}`}
+                            />
+                          )}
                           <span className="text-zinc-300 truncate">{tag}</span>
                         </span>
                       );

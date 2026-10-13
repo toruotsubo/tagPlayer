@@ -12,11 +12,12 @@ import {
   Square,
   MinusSquare,
   Check,
+  Star,
 } from "lucide-react";
 import { Album, TagCategory, TagItem, Track, TrackWithAlbum, categoryDotClasses } from "../types/music";
 import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { sortAlbumTags, tagCategories, tagColorClasses } from "./AlbumGrid";
+import { getAlbumDisplayTags, tagCategories, tagColorClasses } from "./AlbumGrid";
 import { useTranslation } from "../i18n";
 
 interface AlbumDetailModalProps {
@@ -126,17 +127,35 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   const handleAddAlbumTag = async (tagName: string, category = newAlbumTagCategory) => {
     if (!activeAlbum || !tagName.trim()) return;
     try {
-      const updatedTags = await invoke<string[]>("add_album_tag", {
+      const updatedAlbum = await invoke<Album>("add_album_tag", {
         albumId: activeAlbum.id,
         tagName: tagName.trim(),
         category,
       });
-      setActiveAlbum({ ...activeAlbum, tags: updatedTags });
+      setActiveAlbum(updatedAlbum);
       setNewAlbumTag("");
       setIsAddingAlbumTag(false);
       onTagsChanged?.();
     } catch (err) {
       console.error("Add album tag error", err);
+    }
+  };
+
+  const handleTogglePrimaryTag = async (
+    tagName: string,
+    isCurrentPrimary: boolean
+  ) => {
+    if (!activeAlbum) return;
+    try {
+      const updatedAlbum = await invoke<Album>("set_album_primary_tag", {
+        albumId: activeAlbum.id,
+        tagName,
+        isPrimary: !isCurrentPrimary,
+      });
+      setActiveAlbum(updatedAlbum);
+      onTagsChanged?.();
+    } catch (err) {
+      console.error("Toggle primary tag error", err);
     }
   };
 
@@ -165,11 +184,11 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
     }
 
     try {
-      const updatedTags = await invoke<string[]>("remove_album_tag", {
+      const updatedAlbum = await invoke<Album>("remove_album_tag", {
         albumId: activeAlbum.id,
         tagName,
       });
-      setActiveAlbum({ ...activeAlbum, tags: updatedTags });
+      setActiveAlbum(updatedAlbum);
       onTagsChanged?.();
     } catch (err) {
       console.error("Remove album tag error", err);
@@ -451,67 +470,117 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                   {activeAlbum.title}
                 </h2>
 
-                {/* Auto-acquired Artist Tag */}
                 {(() => {
-                  const autoArtistTag =
-                    activeAlbum.tags.find((t) => t.toLowerCase() === activeAlbum.artist.toLowerCase()) ||
-                    (activeAlbum.artist ? activeAlbum.artist : null);
-                  if (!autoArtistTag) return null;
-                  const hasTagInAlbum = activeAlbum.tags.some(
-                    (t) => t.toLowerCase() === autoArtistTag.toLowerCase()
-                  );
-                  const category = getTagCategory(autoArtistTag);
-                  return (
-                    <div className="flex items-center mt-1">
-                      <span
-                        className={`group/tag inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-3 pr-2.5 py-1 rounded-full border select-text cursor-text ${
-                          tagColorClasses[category] || tagColorClasses.artist
-                        }`}
-                        title={autoArtistTag}
-                      >
-                        <span
-                          className={`h-2 w-2 rounded-full shrink-0 ${
-                            categoryDotClasses[category] || categoryDotClasses.artist
-                          }`}
-                        />
-                        <span className="select-text cursor-text text-zinc-200">{autoArtistTag}</span>
-                        {hasTagInAlbum && (
-                          <button
-                            onClick={() => handleRemoveAlbumTag(autoArtistTag)}
-                            className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none ml-0.5"
-                            title={t.albumDetailModal.removeTagTip}
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </span>
-                    </div>
-                  );
-                })()}
+                  const { artistPrimaryTag, secondRowTags } = getAlbumDisplayTags(activeAlbum, availableTags);
+                  const primarySet = new Set((activeAlbum.primary_tags || []).map((t) => t.toLowerCase()));
 
-                {/* Album Tags with Edit & Delete */}
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  {sortAlbumTags(activeAlbum.tags, activeAlbum).map((tName, i) => {
-                    const category = getTagCategory(tName);
-                    return (
-                      <span
-                        key={i}
-                        className={`group/tag inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-3 pr-2.5 py-1 rounded-full border select-text cursor-text ${tagColorClasses[category]}`}
-                      >
-                        <span
-                          className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}
-                        />
-                        <span className="select-text cursor-text text-zinc-200">{tName}</span>
-                        <button
-                          onClick={() => handleRemoveAlbumTag(tName)}
-                          className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none ml-0.5"
-                          title={t.albumDetailModal.removeTagTip}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </span>
-                    );
-                  })}
+                  return (
+                    <>
+                      {/* Artist Primary Tag (アルバムタイトル直下) */}
+                      {artistPrimaryTag && (
+                        <div className="flex items-center mt-1">
+                          {(() => {
+                            const category = getTagCategory(artistPrimaryTag);
+                            const isPrimary = primarySet.has(artistPrimaryTag.toLowerCase());
+                            return (
+                              <span
+                                className={`group/tag inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-2.5 pr-2 py-1 rounded-full border shadow-sm select-text ${
+                                  tagColorClasses[category] || tagColorClasses.artist
+                                }`}
+                                title={artistPrimaryTag}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePrimaryTag(artistPrimaryTag, isPrimary)}
+                                  className="p-0.5 rounded cursor-pointer hover:scale-110 active:scale-95 transition"
+                                  title={t.albumDetailModal.unsetPrimaryTip}
+                                >
+                                  <Star className="h-3.5 w-3.5 fill-current shrink-0 text-emerald-400" />
+                                </button>
+                                <span className="select-text cursor-text text-zinc-100 font-medium">
+                                  {artistPrimaryTag}
+                                </span>
+                                <button
+                                  onClick={() => handleRemoveAlbumTag(artistPrimaryTag)}
+                                  className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none ml-0.5"
+                                  title={t.albumDetailModal.removeTagTip}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                      {/* Album Tags with Edit, Primary Switch & Delete (2行目: ジャンルPrimary, リリース年Primary, 以降非Primaryテキスト昇順) */}
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        {secondRowTags.map((tName, i) => {
+                          const category = getTagCategory(tName);
+                          const isPrimary = primarySet.has(tName.toLowerCase());
+                          const canBePrimary = ["genre", "artist", "release_year"].includes(category);
+                          return (
+                            <span
+                              key={i}
+                              className={`group/tag inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-2.5 pr-2 py-1 rounded-full border select-text ${
+                                isPrimary ? "shadow-sm font-medium" : ""
+                              } ${tagColorClasses[category]}`}
+                            >
+                              <button
+                                type="button"
+                                disabled={!canBePrimary}
+                                onClick={() => {
+                                  if (canBePrimary) {
+                                    handleTogglePrimaryTag(tName, isPrimary);
+                                  }
+                                }}
+                                className={`p-0.5 rounded transition ${
+                                  canBePrimary
+                                    ? "cursor-pointer hover:scale-110 active:scale-95"
+                                    : "cursor-default"
+                                }`}
+                                title={
+                                  isPrimary
+                                    ? t.albumDetailModal.unsetPrimaryTip
+                                    : canBePrimary
+                                    ? t.albumDetailModal.setPrimaryTip(t.categories[category] || category)
+                                    : undefined
+                                }
+                              >
+                                {isPrimary ? (
+                                  <Star
+                                    className={`h-3.5 w-3.5 fill-current shrink-0 ${
+                                      category === "genre"
+                                        ? "text-amber-400"
+                                        : category === "release_year"
+                                        ? "text-sky-400"
+                                        : "text-emerald-400"
+                                    }`}
+                                  />
+                                ) : canBePrimary ? (
+                                  <span className="relative flex items-center justify-center group/star w-3.5 h-3.5">
+                                    <span
+                                      className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]} group-hover/star:opacity-0 transition-opacity`}
+                                    />
+                                    <Star className="h-3.5 w-3.5 text-zinc-400 hover:text-zinc-100 opacity-0 group-hover/star:opacity-100 absolute shrink-0 transition-opacity" />
+                                  </span>
+                                ) : (
+                                  <span
+                                    className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}
+                                  />
+                                )}
+                              </button>
+                              <span className="select-text cursor-text text-zinc-200">{tName}</span>
+                              <button
+                                onClick={() => handleRemoveAlbumTag(tName)}
+                                className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none ml-0.5"
+                                title={t.albumDetailModal.removeTagTip}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </span>
+                          );
+                        })}
 
                   {/* Add Album Tag Button / Input */}
                   {isAddingAlbumTag ? (
@@ -582,6 +651,9 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                     {t.albumDetailModal.finishEditingButton}
                   </button>
                 </div>
+                    </>
+                  );
+                })()}
 
                 {/* Tag Suggestions for Album */}
                 {isAddingAlbumTag && (

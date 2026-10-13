@@ -155,6 +155,8 @@ export interface Translations {
     deleteAutoTagConfirm: (tagName: string, tagTypeLabel: string) => string;
     deleteAlbumConfirm: (title: string) => string;
     removeTagTip: string;
+    setPrimaryTip: (category: string) => string;
+    unsetPrimaryTip: string;
     albumTagPlaceholder: string;
     albumTagCategoryAria: string;
     addAlbumTagButton: string;

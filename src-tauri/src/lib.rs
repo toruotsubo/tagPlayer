@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use rusqlite::Connection;
 use tauri::{Manager, State};
 
-use models::{LibraryData, PlaybackStatus, Playlist, Track, TrackWithAlbum};
+use models::{Album, LibraryData, PlaybackStatus, Playlist, Track, TrackWithAlbum};
 use player::PlayerManager;
 
 
@@ -162,12 +162,34 @@ async fn delete_playlist(
 }
 
 #[tauri::command]
+async fn get_album(
+    app_handle: tauri::AppHandle,
+    album_id: i64,
+) -> Result<Album, String> {
+    let db_path = get_db_path(&app_handle)?;
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+    db::get_album(&conn, album_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn set_album_primary_tag(
+    app_handle: tauri::AppHandle,
+    album_id: i64,
+    tag_name: String,
+    is_primary: bool,
+) -> Result<Album, String> {
+    let db_path = get_db_path(&app_handle)?;
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+    db::set_album_primary_tag(&conn, album_id, &tag_name, is_primary).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn add_album_tag(
     app_handle: tauri::AppHandle,
     album_id: i64,
     tag_name: String,
     category: String,
-) -> Result<Vec<String>, String> {
+) -> Result<Album, String> {
     let db_path = get_db_path(&app_handle)?;
     let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
     db::add_album_tag(&conn, album_id, &tag_name, &category).map_err(|e| e.to_string())
@@ -178,7 +200,7 @@ async fn remove_album_tag(
     app_handle: tauri::AppHandle,
     album_id: i64,
     tag_name: String,
-) -> Result<Vec<String>, String> {
+) -> Result<Album, String> {
     let db_path = get_db_path(&app_handle)?;
     let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
     db::remove_album_tag(&conn, album_id, &tag_name).map_err(|e| e.to_string())
@@ -322,6 +344,8 @@ pub fn run() {
             get_playlists,
             get_playlist_tracks,
             delete_playlist,
+            get_album,
+            set_album_primary_tag,
             add_album_tag,
             remove_album_tag,
             add_track_tag,

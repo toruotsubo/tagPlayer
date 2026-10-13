@@ -67,6 +67,7 @@ pub struct Album {
     pub cover_url: Option<String>,
     pub track_count: usize,
     pub tags: Vec<String>,
+    pub primary_tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

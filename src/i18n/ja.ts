@@ -163,6 +163,8 @@ export const ja: Translations = {
     deleteAlbumConfirm: (title: string) =>
       `アルバム「${title}」をライブラリから削除しますか？\n（音楽ファイル自体は削除されません）`,
     removeTagTip: "タグを削除",
+    setPrimaryTip: (category: string) => `${category}のPrimaryタグに設定`,
+    unsetPrimaryTip: "Primaryタグを解除",
     albumTagPlaceholder: "アルバムタグ",
     albumTagCategoryAria: "アルバムタグの分類",
     addAlbumTagButton: "追加",

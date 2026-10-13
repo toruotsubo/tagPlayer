@@ -35,6 +35,7 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         CREATE TABLE IF NOT EXISTS album_tags (
             album_id INTEGER NOT NULL REFERENCES albums(id) ON DELETE CASCADE,
             tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+            is_primary INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (album_id, tag_id)
         );
 
@@ -74,6 +75,32 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             "ALTER TABLE tags ADD COLUMN category TEXT NOT NULL DEFAULT 'other'",
             [],
         )?;
+    }
+
+    let has_is_primary: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('album_tags') WHERE name = 'is_primary'",
+        [],
+        |row| row.get(0),
+    )?;
+    if has_is_primary == 0 {
+        conn.execute(
+            "ALTER TABLE album_tags ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0",
+            [],
+        )?;
+        // 既存データのデフォルトPrimaryタグ設定
+        // アルバムの artist, genre, release_year に一致する tag を is_primary = 1 に設定
+        let _ = conn.execute(
+            "UPDATE album_tags SET is_primary = 1
+             WHERE rowid IN (
+                 SELECT at.rowid FROM album_tags at
+                 JOIN tags tg ON at.tag_id = tg.id
+                 JOIN albums a ON at.album_id = a.id
+                 WHERE (tg.name = a.artist COLLATE NOCASE)
+                    OR (tg.name = a.genre COLLATE NOCASE)
+                    OR (a.release_year IS NOT NULL AND tg.name = CAST(a.release_year AS TEXT))
+             )",
+            [],
+        );
     }
 
     let _ = fix_missing_disc_numbers(conn);
@@ -177,17 +204,26 @@ pub fn get_all_albums(conn: &Connection) -> Result<Vec<Album>> {
         // アルバムのタグを取得
         let mut tag_stmt = conn.prepare(
             "
-            SELECT tg.name
+            SELECT tg.name, at.is_primary
             FROM tags tg
             JOIN album_tags at ON tg.id = at.tag_id
             WHERE at.album_id = ?1
             ORDER BY tg.name COLLATE NOCASE ASC
             ",
         )?;
-        let tags: Vec<String> = tag_stmt
-            .query_map(params![id], |r| r.get(0))?
-            .filter_map(|r| r.ok())
-            .collect();
+        let mut tags = Vec::new();
+        let mut primary_tags = Vec::new();
+        let rows = tag_stmt.query_map(params![id], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+        })?;
+        for r in rows {
+            if let Ok((name, is_pri)) = r {
+                if is_pri == 1 {
+                    primary_tags.push(name.clone());
+                }
+                tags.push(name);
+            }
+        }
 
         albums.push(Album {
             id,
@@ -198,10 +234,60 @@ pub fn get_all_albums(conn: &Connection) -> Result<Vec<Album>> {
             cover_url,
             track_count,
             tags,
+            primary_tags,
         });
     }
 
     Ok(albums)
+}
+
+pub fn get_album(conn: &Connection, album_id: i64) -> Result<Album> {
+    let mut stmt = conn.prepare(
+        "
+        SELECT a.id, a.title, a.artist, a.release_year, a.genre, a.cover_url, COUNT(t.id) as track_count
+        FROM albums a
+        LEFT JOIN tracks t ON a.id = t.album_id
+        WHERE a.id = ?1
+        GROUP BY a.id
+        "
+    )?;
+
+    let mut album = stmt.query_row(params![album_id], |row| {
+        Ok(Album {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            artist: row.get(2)?,
+            release_year: row.get(3)?,
+            genre: row.get(4)?,
+            cover_url: row.get(5)?,
+            track_count: row.get::<_, i64>(6)? as usize,
+            tags: Vec::new(),
+            primary_tags: Vec::new(),
+        })
+    })?;
+
+    let mut tag_stmt = conn.prepare(
+        "
+        SELECT tg.name, at.is_primary
+        FROM tags tg
+        JOIN album_tags at ON tg.id = at.tag_id
+        WHERE at.album_id = ?1
+        ORDER BY tg.name COLLATE NOCASE ASC
+        ",
+    )?;
+    let rows = tag_stmt.query_map(params![album_id], |r| {
+        Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+    })?;
+    for r in rows {
+        if let Ok((name, is_pri)) = r {
+            if is_pri == 1 {
+                album.primary_tags.push(name.clone());
+            }
+            album.tags.push(name);
+        }
+    }
+
+    Ok(album)
 }
 
 pub fn get_album_tracks(conn: &Connection, album_id: i64) -> Result<Vec<Track>> {
@@ -568,23 +654,66 @@ pub fn get_track_tags(conn: &Connection, track_id: i64) -> Result<Vec<String>> {
     Ok(tags)
 }
 
+pub fn set_album_primary_tag(
+    conn: &Connection,
+    album_id: i64,
+    tag_name: &str,
+    is_primary: bool,
+) -> Result<Album> {
+    let tag_row: Result<(i64, String), _> = conn.query_row(
+        "SELECT id, category FROM tags WHERE name = ?1 COLLATE NOCASE",
+        params![tag_name.trim()],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    );
+
+    if let Ok((tag_id, category)) = tag_row {
+        if matches!(category.as_str(), "genre" | "artist" | "release_year") {
+            if is_primary {
+                // 同じアルバムの同じカテゴリの他のタグのPrimaryを解除
+                conn.execute(
+                    "UPDATE album_tags SET is_primary = 0
+                     WHERE album_id = ?1 AND tag_id IN (
+                         SELECT id FROM tags WHERE category = ?2
+                     )",
+                    params![album_id, category],
+                )?;
+                // 対象タグをPrimaryに設定
+                conn.execute(
+                    "UPDATE album_tags SET is_primary = 1
+                     WHERE album_id = ?1 AND tag_id = ?2",
+                    params![album_id, tag_id],
+                )?;
+            } else {
+                // 対象タグのPrimaryを解除
+                conn.execute(
+                    "UPDATE album_tags SET is_primary = 0
+                     WHERE album_id = ?1 AND tag_id = ?2",
+                    params![album_id, tag_id],
+                )?;
+            }
+        }
+    }
+
+    get_album(conn, album_id)
+}
+
 pub fn add_album_tag(
     conn: &Connection,
     album_id: i64,
     tag_name: &str,
     category: &str,
-) -> Result<Vec<String>> {
+) -> Result<Album> {
     let tag_id = get_or_create_tag_with_category(conn, tag_name, category)?;
     if tag_id > 0 {
         conn.execute(
-            "INSERT OR IGNORE INTO album_tags (album_id, tag_id) VALUES (?1, ?2)",
+            "INSERT OR IGNORE INTO album_tags (album_id, tag_id, is_primary) VALUES (?1, ?2, 0)",
             params![album_id, tag_id],
         )?;
     }
-    get_album_tags(conn, album_id)
+    get_album(conn, album_id)
 }
 
-pub fn remove_album_tag(conn: &Connection, album_id: i64, tag_name: &str) -> Result<Vec<String>> {
+pub fn remove_album_tag(conn: &Connection, album_id: i64, tag_name: &str) -> Result<Album> {
     let tag_id_res: Result<i64, _> = conn.query_row(
         "SELECT id FROM tags WHERE name = ?1 COLLATE NOCASE",
         params![tag_name.trim()],
@@ -597,7 +726,7 @@ pub fn remove_album_tag(conn: &Connection, album_id: i64, tag_name: &str) -> Res
         )?;
         let _ = cleanup_unused_tags(conn);
     }
-    get_album_tags(conn, album_id)
+    get_album(conn, album_id)
 }
 
 pub fn add_track_tag(

@@ -12,6 +12,9 @@ import {
 } from "lucide-react";
 import { Playlist, TagCategory, TagItem, categoryDotClasses } from "../types/music";
 import { useTranslation } from "../i18n";
+import { TagSortSelect, TagSortOrder } from "./TagSortSelect";
+
+export type { TagSortOrder };
 
 interface TagSidebarProps {
   tags: TagItem[];
@@ -27,8 +30,6 @@ interface TagSidebarProps {
   onPlayPlaylist: (playlist: Playlist) => void;
   onDeletePlaylist: (playlistId: number) => void;
 }
-
-export type TagSortOrder = "count-asc" | "count-desc" | "name-asc" | "name-desc";
 
 export const TagSidebar: React.FC<TagSidebarProps> = ({
   tags,
@@ -278,26 +279,18 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
           </div>
 
           {/* Tag Sort */}
-          <div className="flex items-center justify-end text-[11px] px-0.5 pt-0.5">
-            <div className="flex items-center gap-1.5">
-              <ArrowUpDown className="h-3 w-3 text-zinc-500 shrink-0" />
-              <select
+          <div className="flex items-center justify-end text-xs px-0.5 pt-0.5">
+            <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+              <ArrowUpDown className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+              <TagSortSelect
                 value={tagSortOrder}
-                onChange={(e) => {
-                  const nextSort = e.target.value as TagSortOrder;
+                onChange={(nextSort) => {
                   setTagSortOrder(nextSort);
                   try {
                     localStorage.setItem("tagPlayer_tagSortOrder", nextSort);
                   } catch {}
                 }}
-                className="bg-zinc-950/80 border border-zinc-800 text-zinc-300 rounded px-1.5 py-0.5 text-[11px] focus:outline-none focus:border-indigo-500 cursor-pointer transition hover:border-zinc-700"
-                aria-label={t.sidebar.sortLabel}
-              >
-                <option value="count-asc" className="bg-zinc-900 text-zinc-200">{t.sidebar.sortCountAsc}</option>
-                <option value="count-desc" className="bg-zinc-900 text-zinc-200">{t.sidebar.sortCountDesc}</option>
-                <option value="name-asc" className="bg-zinc-900 text-zinc-200">{t.sidebar.sortNameAsc}</option>
-                <option value="name-desc" className="bg-zinc-900 text-zinc-200">{t.sidebar.sortNameDesc}</option>
-              </select>
+              />
             </div>
           </div>
 

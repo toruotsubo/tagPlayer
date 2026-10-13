@@ -165,6 +165,8 @@ export const en: Translations = {
     deleteAlbumConfirm: (title: string) =>
       `Are you sure you want to remove album "${title}" from your library?\n(Audio files will not be deleted)`,
     removeTagTip: "Remove tag",
+    setPrimaryTip: (category: string) => `Set as primary ${category} tag`,
+    unsetPrimaryTip: "Remove primary tag",
     albumTagPlaceholder: "Album tag",
     albumTagCategoryAria: "Album tag category",
     addAlbumTagButton: "Add",

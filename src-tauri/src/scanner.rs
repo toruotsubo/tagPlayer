@@ -936,20 +936,21 @@ pub fn scan_and_save_directory(
         );
 
         for at in album_tags {
-            let category = if group.genre.as_deref() == Some(at.as_str()) {
-                "genre"
+            let (category, is_primary) = if group.genre.as_deref() == Some(at.as_str()) {
+                ("genre", 1)
             } else if at == group.artist {
-                "artist"
+                ("artist", 1)
             } else if group.year.map(|year| year.to_string()) == Some(at.clone()) {
-                "release_year"
+                ("release_year", 1)
             } else {
-                "other"
+                ("other", 0)
             };
             if let Ok(tag_id) = get_or_create_tag_with_category(&tx, &at, category) {
                 if tag_id > 0 {
                     let _ = tx.execute(
-                        "INSERT OR IGNORE INTO album_tags (album_id, tag_id) VALUES (?1, ?2)",
-                        params![album_id, tag_id],
+                        "INSERT INTO album_tags (album_id, tag_id, is_primary) VALUES (?1, ?2, ?3)
+                         ON CONFLICT(album_id, tag_id) DO UPDATE SET is_primary = MAX(album_tags.is_primary, excluded.is_primary)",
+                        params![album_id, tag_id, is_primary],
                     );
                 }
             }
