@@ -13,10 +13,14 @@ import {
   MinusSquare,
   Check,
   Star,
+  Image,
+  RotateCcw,
+  Loader2,
 } from "lucide-react";
 import { Album, TagCategory, TagItem, Track, TrackWithAlbum, categoryDotClasses } from "../types/music";
 import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { getAlbumDisplayTags, tagCategories, tagColorClasses } from "./AlbumGrid";
 import { useTranslation } from "../i18n";
 
@@ -34,6 +38,7 @@ interface AlbumDetailModalProps {
   onPlayAlbum?: (album: Album, tracks: Track[]) => void;
   onQueueAlbum?: (album: Album, tracks: Track[]) => void;
   onDeleteAlbum?: (albumId: number) => Promise<void>;
+  onAlbumUpdated?: (album: Album) => void;
   onTagsChanged?: () => void;
 }
 
@@ -51,6 +56,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   onPlayAlbum,
   onQueueAlbum,
   onDeleteAlbum,
+  onAlbumUpdated,
   onTagsChanged,
 }) => {
   const { t } = useTranslation();
@@ -60,6 +66,8 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loadingTracks, setLoadingTracks] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isUpdatingCover, setIsUpdatingCover] = useState(false);
+  const [coverCacheBuster, setCoverCacheBuster] = useState<number>(Date.now());
 
   // Track selection state for batch tag editing
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set());
@@ -82,6 +90,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   // Load tracks when album or initialEditingTrackId changes
   useEffect(() => {
     setActiveAlbum(album);
+    setCoverCacheBuster(Date.now());
     setSelectedTrackIds(new Set());
     setLastSelectedTrackIndex(null);
     setBatchTrackTag("");
@@ -454,6 +463,66 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
     }
   };
 
+  const handleChangeCover = async () => {
+    if (!activeAlbum) return;
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [
+          {
+            name: "Images",
+            extensions: ["jpg", "jpeg", "png", "webp", "bmp", "gif"],
+          },
+        ],
+        title: t.albumDetailModal.changeCoverTip,
+      });
+
+      if (!selected) return;
+
+      const filePath = typeof selected === "string" ? selected : selected[0];
+      if (!filePath) return;
+
+      setIsUpdatingCover(true);
+      const updatedAlbum = await invoke<Album>("update_album_cover", {
+        albumId: activeAlbum.id,
+        sourceFilePath: filePath,
+      });
+
+      setActiveAlbum(updatedAlbum);
+      setCoverCacheBuster(Date.now());
+      onAlbumUpdated?.(updatedAlbum);
+      onTagsChanged?.();
+    } catch (err) {
+      console.error("Failed to update album cover", err);
+      alert(t.albumDetailModal.changeCoverError(err));
+    } finally {
+      setIsUpdatingCover(false);
+    }
+  };
+
+  const handleResetCover = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!activeAlbum || !activeAlbum.cover_url) return;
+    const confirmed = window.confirm(t.albumDetailModal.resetCoverConfirm);
+    if (!confirmed) return;
+
+    try {
+      setIsUpdatingCover(true);
+      const updatedAlbum = await invoke<Album>("reset_album_cover", {
+        albumId: activeAlbum.id,
+      });
+      setActiveAlbum(updatedAlbum);
+      setCoverCacheBuster(Date.now());
+      onAlbumUpdated?.(updatedAlbum);
+      onTagsChanged?.();
+    } catch (err) {
+      console.error("Failed to reset album cover", err);
+      alert(t.albumDetailModal.changeCoverError(err));
+    } finally {
+      setIsUpdatingCover(false);
+    }
+  };
+
   if (!activeAlbum) return null;
 
   return (
@@ -464,15 +533,52 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
           {/* Top Row: Album Info & Close Button */}
           <div className="flex items-start justify-between gap-4">
             <div className="flex gap-4 min-w-0 flex-1">
-              <div className="h-24 w-24 rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800 shrink-0 flex items-center justify-center shadow-inner">
+              {/* Album Cover & Change Overlay */}
+              <div className="relative group/cover h-24 w-24 rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800 shrink-0 flex items-center justify-center shadow-inner select-none">
                 {activeAlbum.cover_url ? (
                   <img
-                    src={convertFileSrc(activeAlbum.cover_url)}
+                    src={`${convertFileSrc(activeAlbum.cover_url)}?t=${coverCacheBuster}`}
                     alt={activeAlbum.title}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover transition-transform duration-200 group-hover/cover:scale-105"
                   />
                 ) : (
                   <Disc3 className="h-10 w-10 text-zinc-600" />
+                )}
+
+                {/* Updating Overlay */}
+                {isUpdatingCover && (
+                  <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center gap-1 z-10">
+                    <Loader2 className="h-6 w-6 text-indigo-400 animate-spin" />
+                  </div>
+                )}
+
+                {/* Hover Action Overlay */}
+                {!isUpdatingCover && (
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/cover:opacity-100 flex flex-col items-center justify-center transition-all duration-200">
+                    <button
+                      type="button"
+                      onClick={handleChangeCover}
+                      className="w-full h-full flex flex-col items-center justify-center text-white cursor-pointer p-1 text-center hover:bg-black/25 active:scale-95 transition"
+                      title={t.albumDetailModal.changeCoverTip}
+                    >
+                      <Image className="h-5 w-5 text-zinc-100 mb-1 group-hover/cover:scale-110 transition-transform" />
+                      <span className="text-[10px] font-medium leading-tight text-zinc-200 drop-shadow-sm">
+                        {t.albumDetailModal.changeCover}
+                      </span>
+                    </button>
+
+                    {/* Reset Cover Button (only if cover exists) */}
+                    {activeAlbum.cover_url && (
+                      <button
+                        type="button"
+                        onClick={handleResetCover}
+                        className="absolute top-1 right-1 p-1 rounded-md bg-zinc-900/90 hover:bg-red-950 text-zinc-400 hover:text-red-400 border border-zinc-700/70 transition cursor-pointer active:scale-90"
+                        title={t.albumDetailModal.resetCoverTip}
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="flex flex-col justify-center min-w-0 flex-1">

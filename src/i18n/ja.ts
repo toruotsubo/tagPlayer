@@ -158,6 +158,14 @@ export const ja: Translations = {
     closeButton: "閉じる",
   },
   albumDetailModal: {
+    changeCover: "画像を変更",
+    changeCoverTip: "アルバムカバー画像を変更する",
+    changeCoverSuccess: "カバー画像を変更しました",
+    changeCoverError: (err: unknown) =>
+      `カバー画像の変更に失敗しました: ${String(err)}`,
+    resetCoverTip: "カバー画像を解除（デフォルトに戻す）",
+    resetCoverConfirm:
+      "アルバムカバー画像を解除しますか？\n（ライブラリ上の表示のみ解除されます）",
     deleteAutoTagConfirm: (tagName: string, tagTypeLabel: string) =>
       `タグ「${tagName}」は楽曲メタデータから自動生成された${tagTypeLabel}タグです。\n削除してもよろしいですか？`,
     deleteAlbumConfirm: (title: string) =>

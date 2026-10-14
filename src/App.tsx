@@ -35,6 +35,7 @@ import {
   categoryDotClasses,
   AlbumSortOrder,
   TrackSortOrder,
+  TagCategory,
 } from "./types/music";
 import { TagSidebar } from "./components/TagSidebar";
 import { AlbumGrid } from "./components/AlbumGrid";
@@ -419,6 +420,29 @@ function App() {
     setModalTrackId(null);
   };
 
+  const handleAlbumUpdated = (updatedAlbum: Album) => {
+    setModalAlbum(updatedAlbum);
+    setLibrary((prev) => ({
+      ...prev,
+      albums: prev.albums.map((a) => (a.id === updatedAlbum.id ? updatedAlbum : a)),
+    }));
+    setQueue((prev) =>
+      prev.map((t) =>
+        t.album_id === updatedAlbum.id
+          ? { ...t, cover_url: updatedAlbum.cover_url }
+          : t
+      )
+    );
+    setTagTracks((prev) =>
+      prev.map((t) =>
+        t.album_id === updatedAlbum.id
+          ? { ...t, cover_url: updatedAlbum.cover_url }
+          : t
+      )
+    );
+    showToast(t.albumDetailModal.changeCoverSuccess);
+  };
+
   // アルバムのライブラリからの削除
   const handleDeleteAlbum = async (albumId: number) => {
     const targetAlbum = library.albums.find((a) => a.id === albumId);
@@ -662,8 +686,10 @@ function App() {
     if (
       saved === "artist-title-year" ||
       saved === "artist-year-title" ||
+      saved === "year-artist-title" ||
       saved === "genre-artist-title-year" ||
-      saved === "genre-artist-year-title"
+      saved === "genre-artist-year-title" ||
+      saved === "genre-year-artist-title"
     ) {
       return saved;
     }
@@ -699,6 +725,15 @@ function App() {
     });
   }, [library.albums, selectedTags, matchAll, albumSearchQuery]);
 
+  // タグ名 -> カテゴリのマップ
+  const tagCategoryMap = useMemo(() => {
+    const map = new Map<string, TagCategory>();
+    for (const tag of library.tags) {
+      map.set(tag.name.toLowerCase(), tag.category);
+    }
+    return map;
+  }, [library.tags]);
+
   // アルバム一覧のソート処理
   const sortedAlbums = useMemo(() => {
     const compareText = (a: string | undefined | null, b: string | undefined | null) => {
@@ -710,16 +745,52 @@ function App() {
       return sA.localeCompare(sB, "ja", { sensitivity: "base" });
     };
 
-    const compareYear = (a: number | undefined | null, b: number | undefined | null) => {
-      const yA = a ?? 9999;
-      const yB = b ?? 9999;
+    const getAlbumReleaseYear = (album: Album): number | null => {
+      const primarySet = new Set((album.primary_tags ?? []).map((t) => t.toLowerCase()));
+
+      // 1. primaryタグの中から release_year カテゴリのタグを探す
+      for (const tag of album.tags) {
+        const lower = tag.toLowerCase();
+        if (primarySet.has(lower)) {
+          const cat = tagCategoryMap.get(lower);
+          if (cat === "release_year") {
+            const parsed = parseInt(tag.trim(), 10);
+            if (!isNaN(parsed) && parsed > 0) {
+              return parsed;
+            }
+          }
+        }
+      }
+
+      // 2. primaryタグの中で4桁の年（1000〜2999）としてパースできるものがあればそれを使用
+      for (const tag of album.tags) {
+        const lower = tag.toLowerCase();
+        if (primarySet.has(lower)) {
+          const parsed = parseInt(tag.trim(), 10);
+          if (!isNaN(parsed) && parsed >= 1000 && parsed <= 2999) {
+            return parsed;
+          }
+        }
+      }
+
+      // 3. Primaryタグに見つからない場合は、フォールバックとして album.release_year を使用
+      if (album.release_year && album.release_year > 0) {
+        return album.release_year;
+      }
+
+      return null;
+    };
+
+    const compareYear = (aYear: number | null, bYear: number | null) => {
+      const yA = aYear ?? 9999;
+      const yB = bYear ?? 9999;
       return yA - yB;
     };
 
     return [...filteredAlbums].sort((a, b) => {
       const cmpArtist = compareText(a.artist, b.artist);
       const cmpTitle = compareText(a.title, b.title);
-      const cmpYear = compareYear(a.release_year, b.release_year);
+      const cmpYear = compareYear(getAlbumReleaseYear(a), getAlbumReleaseYear(b));
       const cmpGenre = compareText(a.genre, b.genre);
 
       switch (albumSortOrder) {
@@ -727,15 +798,19 @@ function App() {
           return cmpArtist || cmpTitle || cmpYear;
         case "artist-year-title":
           return cmpArtist || cmpYear || cmpTitle;
+        case "year-artist-title":
+          return cmpYear || cmpArtist || cmpTitle;
         case "genre-artist-title-year":
           return cmpGenre || cmpArtist || cmpTitle || cmpYear;
         case "genre-artist-year-title":
           return cmpGenre || cmpArtist || cmpYear || cmpTitle;
+        case "genre-year-artist-title":
+          return cmpGenre || cmpYear || cmpArtist || cmpTitle;
         default:
           return 0;
       }
     });
-  }, [filteredAlbums, albumSortOrder]);
+  }, [filteredAlbums, albumSortOrder, tagCategoryMap]);
 
   // 曲一覧のソート順
   const [trackSortOrder, setTrackSortOrder] = useState<TrackSortOrder>(() => {
@@ -1104,6 +1179,7 @@ function App() {
         onPlayAlbum={handlePlayAlbum}
         onQueueAlbum={handleQueueAlbum}
         onDeleteAlbum={handleDeleteAlbum}
+        onAlbumUpdated={handleAlbumUpdated}
         onTagsChanged={() => {
           loadLibrary();
           if (selectedTags.length > 0 || viewMode === "tracks") {

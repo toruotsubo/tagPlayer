@@ -31,6 +31,51 @@ fn get_cache_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(covers_dir)
 }
 
+fn cleanup_unused_covers(app_handle: &tauri::AppHandle) {
+    let (db_path, covers_dir) = match (get_db_path(app_handle), get_cache_dir(app_handle)) {
+        (Ok(db), Ok(covers)) => (db, covers),
+        _ => return,
+    };
+
+    if !db_path.exists() {
+        return;
+    }
+
+    let conn = match Connection::open(&db_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Failed to open DB for cover cleanup: {}", e);
+            return;
+        }
+    };
+
+    let used_filenames = match db::get_all_used_cover_filenames(&conn) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("Failed to get used cover filenames: {}", e);
+            return;
+        }
+    };
+
+    if let Ok(entries) = fs::read_dir(&covers_dir) {
+        for entry in entries.flatten() {
+            if let Ok(file_type) = entry.file_type() {
+                if file_type.is_file() {
+                    let file_name = entry.file_name().to_string_lossy().to_lowercase();
+                    if !used_filenames.contains(&file_name) {
+                        let path = entry.path();
+                        if let Err(e) = fs::remove_file(&path) {
+                            eprintln!("Failed to remove unused cover {:?}: {}", path, e);
+                        } else {
+                            println!("Removed unused cover: {}", file_name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[tauri::command]
 async fn scan_music_directory(
     app_handle: tauri::AppHandle,
@@ -259,7 +304,63 @@ async fn delete_album(
 ) -> Result<(), String> {
     let db_path = get_db_path(&app_handle)?;
     let mut conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
-    db::delete_album(&mut conn, album_id).map_err(|e| e.to_string())
+    db::delete_album(&mut conn, album_id).map_err(|e| e.to_string())?;
+    cleanup_unused_covers(&app_handle);
+    Ok(())
+}
+
+#[tauri::command]
+async fn update_album_cover(
+    app_handle: tauri::AppHandle,
+    album_id: i64,
+    source_file_path: String,
+) -> Result<Album, String> {
+    let source_path = PathBuf::from(&source_file_path);
+    if !source_path.exists() || !source_path.is_file() {
+        return Err("指定された画像ファイルが存在しません".to_string());
+    }
+
+    let ext = source_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("jpg")
+        .to_lowercase();
+
+    if !["jpg", "jpeg", "png", "webp", "bmp", "gif"].contains(&ext.as_str()) {
+        return Err("対応していない画像形式です (jpg, png, webp, bmp, gif のみ)".to_string());
+    }
+
+    let covers_dir = get_cache_dir(&app_handle)?;
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+
+    let filename = format!("cover_custom_{}_{}.{}", album_id, timestamp, ext);
+    let target_path = covers_dir.join(&filename);
+
+    fs::copy(&source_path, &target_path)
+        .map_err(|e| format!("カバー画像の保存に失敗しました: {}", e))?;
+
+    let target_path_str = target_path.to_string_lossy().to_string();
+
+    let db_path = get_db_path(&app_handle)?;
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let album = db::update_album_cover(&conn, album_id, Some(&target_path_str)).map_err(|e| e.to_string())?;
+    cleanup_unused_covers(&app_handle);
+    Ok(album)
+}
+
+#[tauri::command]
+async fn reset_album_cover(
+    app_handle: tauri::AppHandle,
+    album_id: i64,
+) -> Result<Album, String> {
+    let db_path = get_db_path(&app_handle)?;
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+    let album = db::update_album_cover(&conn, album_id, None).map_err(|e| e.to_string())?;
+    cleanup_unused_covers(&app_handle);
+    Ok(album)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -272,6 +373,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
+            // アプリ起動時に未使用のカバー画像ファイルをクリーンアップ
+            cleanup_unused_covers(app.handle());
+
             #[cfg(target_os = "windows")]
             {
                 use std::ffi::c_void;
@@ -353,6 +457,8 @@ pub fn run() {
             add_tracks_tag,
             remove_tracks_tag,
             delete_album,
+            update_album_cover,
+            reset_album_cover,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

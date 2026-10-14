@@ -866,3 +866,31 @@ pub fn delete_album(conn: &mut Connection, album_id: i64) -> Result<()> {
 
     Ok(())
 }
+
+pub fn update_album_cover(
+    conn: &Connection,
+    album_id: i64,
+    cover_url: Option<&str>,
+) -> Result<Album> {
+    conn.execute(
+        "UPDATE albums SET cover_url = ?1 WHERE id = ?2",
+        params![cover_url, album_id],
+    )?;
+    get_album(conn, album_id)
+}
+
+pub fn get_all_used_cover_filenames(conn: &Connection) -> Result<std::collections::HashSet<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT DISTINCT cover_url FROM albums WHERE cover_url IS NOT NULL AND cover_url != ''",
+    )?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+    let mut used_filenames = std::collections::HashSet::new();
+    for r in rows {
+        if let Ok(url) = r {
+            if let Some(file_name) = std::path::Path::new(&url).file_name() {
+                used_filenames.insert(file_name.to_string_lossy().to_lowercase());
+            }
+        }
+    }
+    Ok(used_filenames)
+}

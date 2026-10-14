@@ -32,6 +32,10 @@ export const AlbumSortSelect: React.FC<AlbumSortSelectProps> = ({
         labels: [t.albumSort.artist, t.albumSort.releaseYear, t.albumSort.title],
       },
       {
+        value: "year-artist-title",
+        labels: [t.albumSort.releaseYear, t.albumSort.artist, t.albumSort.title],
+      },
+      {
         value: "genre-artist-title-year",
         labels: [
           t.albumSort.genre,
@@ -46,6 +50,15 @@ export const AlbumSortSelect: React.FC<AlbumSortSelectProps> = ({
           t.albumSort.genre,
           t.albumSort.artist,
           t.albumSort.releaseYear,
+          t.albumSort.title,
+        ],
+      },
+      {
+        value: "genre-year-artist-title",
+        labels: [
+          t.albumSort.genre,
+          t.albumSort.releaseYear,
+          t.albumSort.artist,
           t.albumSort.title,
         ],
       },

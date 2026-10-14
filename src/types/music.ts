@@ -3,8 +3,10 @@ export type TagCategory = "genre" | "artist" | "composer" | "release_year" | "ot
 export type AlbumSortOrder =
   | "artist-title-year"
   | "artist-year-title"
+  | "year-artist-title"
   | "genre-artist-title-year"
-  | "genre-artist-year-title";
+  | "genre-artist-year-title"
+  | "genre-year-artist-title";
 
 export type TrackSortOrder = "artist-album-disc-track" | "title";
 

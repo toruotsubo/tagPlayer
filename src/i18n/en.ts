@@ -160,6 +160,14 @@ export const en: Translations = {
     closeButton: "Close",
   },
   albumDetailModal: {
+    changeCover: "Change Cover",
+    changeCoverTip: "Change album cover image",
+    changeCoverSuccess: "Album cover image updated",
+    changeCoverError: (err: unknown) =>
+      `Failed to change cover image: ${String(err)}`,
+    resetCoverTip: "Remove cover image (reset to default)",
+    resetCoverConfirm:
+      "Are you sure you want to remove the album cover image?\n(Only the library display will be reset)",
     deleteAutoTagConfirm: (tagName: string, tagTypeLabel: string) =>
       `Tag "${tagName}" is an automatically generated ${tagTypeLabel} tag from metadata.\nAre you sure you want to delete it?`,
     deleteAlbumConfirm: (title: string) =>

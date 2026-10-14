@@ -152,6 +152,12 @@ export interface Translations {
     closeButton: string;
   };
   albumDetailModal: {
+    changeCover: string;
+    changeCoverTip: string;
+    changeCoverSuccess: string;
+    changeCoverError: (err: unknown) => string;
+    resetCoverTip: string;
+    resetCoverConfirm: string;
     deleteAutoTagConfirm: (tagName: string, tagTypeLabel: string) => string;
     deleteAlbumConfirm: (title: string) => string;
     removeTagTip: string;
