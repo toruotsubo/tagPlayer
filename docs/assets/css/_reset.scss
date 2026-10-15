@@ -1,0 +1,129 @@
+// CSSリセット
+// #############################################################################################
+* {
+	-webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+ul,
+ol,
+li,
+dl,
+dt,
+dd,
+table,
+tr,
+th,
+td,
+form,
+figure {
+	font-size: inherit;
+	margin: 0;
+	padding: 0;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+summary {
+	display: block;
+}
+
+table {
+	border-collapse: collapse;
+	empty-cells: show;
+}
+
+th,
+td {
+	text-align: left;
+	vertical-align: top;
+}
+
+li {
+	list-style: none;
+}
+
+img {
+	vertical-align: top;
+	height: auto;
+}
+
+input,
+textarea,
+select {
+	color: inherit;
+	font-family: inherit;
+	-webkit-appearance: none;
+	appearance: none;
+}
+
+textarea {
+	form-sizing: content;
+}
+
+button {
+	color: inherit;
+	font-family: inherit;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	appearance: none;
+	margin: 0;
+}
+
+input[type="number"] {
+	-moz-appearance: textfield;
+	appearance: textfield;
+}
+
+select::-ms-expand {
+	display: none;
+}
+
+[disabled] {
+	cursor: not-allowed;
+}
+
+input,
+button {
+
+	&[type=button],
+	&[type=submit],
+	&[type=reset] {
+		&:not([disabled]) {
+			cursor: pointer;
+		}
+	}
+}
+
+// アクセシビリティ
+// ==========================================================================
+
+@media (prefers-reduced-motion: reduce) {
+	* {
+		animation: none !important;
+		transition-duration: 0s !important;
+		transition-delay: 0s !important;
+	}
+}
+
+// レスポンシブ対応
+// ==========================================================================
+img,
+video {
+	max-width: 100%;
+	height: auto;
+}

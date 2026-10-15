@@ -1,0 +1,131 @@
+// 変数定義
+// #############################################################################################
+@use 'settings' as *;
+@use 'reset';
+
+// 共通設定
+// #############################################################################################
+
+html {
+	scroll-behavior: smooth;
+	scrollbar-gutter: stable;
+}
+
+body {
+	min-height: 100vh;
+	min-height: 100dvh;
+	color: $colorP;
+	font-family: $sans;
+	font-size: 16px;
+	letter-spacing: 0;
+	line-height: 1.5;
+}
+
+// レスポンシブ対応
+// ==========================================================================
+.wrap {
+	max-width: 1280px;
+
+	margin-inline: auto;
+}
+
+// #header
+// #############################################################################################
+.header {
+	margin: 2em 1em;
+
+	.title {
+		font-size: 2em;
+		text-align: center;
+	}
+
+	.language {
+		margin: 1em 0 0;
+		text-align: right;
+
+		a {
+			text-decoration: underline;
+		}
+	}
+}
+
+// #main
+// #############################################################################################
+.main {
+
+	// #units
+	// ==========================================================================
+	section {
+		margin: 2em 1em;
+
+		@include sp {}
+
+		.title {
+			margin: 0 0 1em;
+			font-size: 1.5em;
+		}
+
+		p:nth-child(n+2) {
+			margin: 1em 0 0;
+		}
+
+		ul:not(.horizontal) {
+			margin: 1em 0 0;
+			padding: 0 0 0 1.5em;
+
+			li {
+				list-style-type: disc;
+			}
+		}
+
+		ul.horizontal {
+			margin: 1em 0;
+
+			li {
+				display: inline;
+
+				&:nth-last-child(n+2) {
+					&::after {
+						content: ',';
+					}
+				}
+			}
+		}
+
+		figure {
+			margin: 2em 0;
+		}
+
+		dl {
+			display: grid;
+			grid-template-columns: auto 1fr;
+			gap: 1em;
+
+			ul:not(.horizontal) {
+				margin: 0;
+			}
+		}
+
+		section {
+			margin: 1.5em 0;
+
+			.title {
+				margin: 0 0 1em;
+				font-size: 1em;
+			}
+		}
+
+		.banner {
+			margin: 1em 0 0;
+		}
+	}
+}
+
+// #footer
+// #############################################################################################
+.footer {
+	@include sp {}
+
+	margin: 2em 0;
+	text-align: center;
+}

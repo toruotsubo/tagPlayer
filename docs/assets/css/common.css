@@ -1,0 +1,209 @@
+@charset "UTF-8";
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+ul,
+ol,
+li,
+dl,
+dt,
+dd,
+table,
+tr,
+th,
+td,
+form,
+figure {
+  font-size: inherit;
+  margin: 0;
+  padding: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+summary {
+  display: block;
+}
+
+table {
+  border-collapse: collapse;
+  empty-cells: show;
+}
+
+th,
+td {
+  text-align: left;
+  vertical-align: top;
+}
+
+li {
+  list-style: none;
+}
+
+img {
+  vertical-align: top;
+  height: auto;
+}
+
+input,
+textarea,
+select {
+  color: inherit;
+  font-family: inherit;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+       appearance: none;
+}
+
+textarea {
+  form-sizing: content;
+}
+
+button {
+  color: inherit;
+  font-family: inherit;
+}
+
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+  -webkit-appearance: textfield;
+          appearance: textfield;
+}
+
+select::-ms-expand {
+  display: none;
+}
+
+[disabled] {
+  cursor: not-allowed;
+}
+
+input[type=button]:not([disabled]), input[type=submit]:not([disabled]), input[type=reset]:not([disabled]),
+button[type=button]:not([disabled]),
+button[type=submit]:not([disabled]),
+button[type=reset]:not([disabled]) {
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    -webkit-animation: none !important;
+            animation: none !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+}
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+html {
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: #000;
+  font-family: "Noto Sans JP", "游ゴシック", "Yu Gothic", "游ゴシック体", "YuGothic", sans-serif;
+  font-size: 16px;
+  letter-spacing: 0;
+  line-height: 1.5;
+}
+
+.wrap {
+  max-width: 1280px;
+  margin-inline: auto;
+}
+
+.header {
+  margin: 2em 1em;
+}
+.header .title {
+  font-size: 2em;
+  text-align: center;
+}
+.header .language {
+  margin: 1em 0 0;
+  text-align: right;
+}
+.header .language a {
+  text-decoration: underline;
+}
+
+.main section {
+  margin: 2em 1em;
+}
+.main section .title {
+  margin: 0 0 1em;
+  font-size: 1.5em;
+}
+.main section p:nth-child(n+2) {
+  margin: 1em 0 0;
+}
+.main section ul:not(.horizontal) {
+  margin: 1em 0 0;
+  padding: 0 0 0 1.5em;
+}
+.main section ul:not(.horizontal) li {
+  list-style-type: disc;
+}
+.main section ul.horizontal {
+  margin: 1em 0;
+}
+.main section ul.horizontal li {
+  display: inline;
+}
+.main section ul.horizontal li:nth-last-child(n+2)::after {
+  content: ",";
+}
+.main section figure {
+  margin: 2em 0;
+}
+.main section dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1em;
+}
+.main section dl ul:not(.horizontal) {
+  margin: 0;
+}
+.main section section {
+  margin: 1.5em 0;
+}
+.main section section .title {
+  margin: 0 0 1em;
+  font-size: 1em;
+}
+.main section .banner {
+  margin: 1em 0 0;
+}
+
+.footer {
+  margin: 2em 0;
+  text-align: center;
+}
+/*# sourceMappingURL=common.css.map */

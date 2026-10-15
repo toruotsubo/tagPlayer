@@ -1,0 +1,194 @@
+// 変数
+// #############################################################################################
+// size
+$pcWidth: 1280;
+$pcWrapWidth: 1280;
+$spWidth: 750;
+$spDesignWidth: 375;
+$spPadding: 0;
+// color
+$colorP: #000; // primary color
+// font
+$baseFontSize: .16rem;
+$baseFontSizeSp: .16rem;
+$baseLetterSpacing: 0;
+$baseLineHeight: 1.5;
+$baseLineHeightSp: 1.5;
+$serif: "Noto Serif JP", "游明朝", "Yu Mincho", "游明朝体", "YuMincho", serif;
+$sans: "Noto Sans JP", "游ゴシック", "Yu Gothic", "游ゴシック体", "YuGothic", sans-serif;
+
+// メディアクエリ
+// #############################################################################################
+@mixin pc {
+	@media screen and (min-width: #{$spWidth + 1}px) {
+		@content;
+	}
+}
+
+@mixin pcNarrow {
+	@media screen and (max-width: #{$pcWidth}px) and (min-width: #{$spWidth + 1}px) {
+		@content;
+	}
+}
+
+@mixin pcPortrait {
+	@media screen and (min-width: #{$spWidth + 1}px) and (orientation: portrait) {
+		@content;
+	}
+}
+
+@mixin pcLandscape {
+	@media screen and (min-width: #{$spWidth + 1}px) and (orientation: landscape) {
+		@content;
+	}
+}
+
+@mixin tablet {
+	@media screen and (max-width: 1366px) and (min-width: #{$spWidth + 1}px) and (hover: none) {
+		@content;
+	}
+}
+
+@mixin sp {
+	@media screen and (max-width: #{$spWidth}px) {
+		@content;
+	}
+}
+
+@mixin spPortrait {
+	@media screen and (max-width: #{$spWidth}px) and (orientation: portrait) {
+		@content;
+	}
+}
+
+@mixin spLandscape {
+	@media screen and (max-height: #{$spWidth}px) and (orientation: landscape) {
+		@content;
+	}
+}
+
+@mixin spLandscape_noTablet {
+	@media screen and (max-height: 697px) and (orientation: landscape) {
+		@content;
+	}
+}
+
+@mixin hover {
+	@media screen and (hover: hover) and (pointer: fine) {
+		@content;
+	}
+}
+
+@mixin animation {
+	@media (prefers-reduced-motion: no-preference) {
+		@content;
+	}
+}
+
+// ユーティリティ
+// #############################################################################################
+
+@function spSize ($px) {
+	@return 100vw * $px / $spDesignWidth;
+}
+
+// テキスト
+
+@mixin textCrop($lineHeight: $baseLineHeight) {
+	line-height: $lineHeight;
+
+	&::before,
+	&::after {
+		content: '';
+		display: block;
+		height: 0;
+		width: 0;
+	}
+
+	&::before {
+		margin-bottom: #{((1 - $lineHeight) / 2)}em;
+	}
+
+	&::after {
+		margin-top: #{((1 - $lineHeight) / 2)}em;
+	}
+}
+
+%textCrop {
+
+	&::before,
+	&::after {
+		content: '';
+		display: block;
+		height: 0;
+		width: 0;
+	}
+
+	&::before {
+		margin-bottom: calc((1em - 1lh)/2);
+	}
+
+	&::after {
+		margin-top: calc((1em - 1lh)/2);
+	}
+}
+
+%sans {
+	font-family: $sans;
+}
+
+%serif {
+	font-family: $serif;
+}
+
+%indent {
+	text-align: left;
+	text-indent: hanging 1em;
+}
+
+%textShadow_w {
+	text-shadow: 0 0 .1em #fff, 0 0 .2em #fff, 0 0 .4em #fff, 0 0 .6em #fff, 0 0 8em #fff;
+}
+
+%textShadow_bk {
+	text-shadow: 0 0 .1em #000, 0 0 .2em #000, 0 0 .4em #000, 0 0 .6em #000, 0 0 .8em #000;
+}
+
+// レイアウト
+
+%clearfix::after {
+	content: "";
+	display: block;
+	clear: both;
+}
+
+%hideScrollBar {
+	&::-webkit-scrollbar {
+		display: none;
+	}
+
+	scrollbar-width: none;
+}
+
+// アニメーション
+
+%hov {
+	@include hover {
+		@include animation {
+			transition: opacity .4s;
+
+			@supports (filter: brightness(100%)) {
+				transition-property: filter;
+			}
+		}
+
+		&:hover {
+			opacity: .8;
+
+			@supports (filter: brightness(100%)) {
+				filter: brightness(110%);
+				opacity: 1;
+			}
+		}
+	}
+}
