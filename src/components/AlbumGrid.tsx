@@ -11,6 +11,7 @@ import { Album, TagCategory, TagItem, Track, categoryDotClasses } from "../types
 import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useTranslation, getTranslation } from "../i18n";
+import { stripLeadingThe } from "../utils/sortUtils";
 
 export interface AlbumGridProps {
   albums: Album[];
@@ -23,6 +24,7 @@ export interface AlbumGridProps {
   onPlayAlbum?: (album: Album, tracks: Track[]) => void;
   onQueueAlbum?: (album: Album, tracks: Track[]) => void;
   onToggleTag?: (tagName: string) => void;
+  ignoreLeadingThe?: boolean;
 }
 
 export const tagCategories: { value: TagCategory; label: string }[] = [
@@ -61,7 +63,8 @@ export interface AlbumDisplayTags {
  */
 export const getAlbumDisplayTags = (
   album: Album,
-  availableTags: TagItem[]
+  availableTags: TagItem[],
+  ignoreLeadingThe: boolean = false
 ): AlbumDisplayTags => {
   const primarySet = new Set(
     (album.primary_tags || []).map((t) => t.toLowerCase())
@@ -126,7 +129,15 @@ export const getAlbumDisplayTags = (
   }
 
   // 非Primaryタグはテキスト昇順
-  nonPrimaryTags.sort((a, b) => a.localeCompare(b));
+  nonPrimaryTags.sort((a, b) => {
+    const isArtistA = getCategory(a) === "artist";
+    const isArtistB = getCategory(b) === "artist";
+    const nameA = ignoreLeadingThe && isArtistA ? stripLeadingThe(a) : a;
+    const nameB = ignoreLeadingThe && isArtistB ? stripLeadingThe(b) : b;
+    const cmp = nameA.localeCompare(nameB, "ja", { sensitivity: "base" });
+    if (cmp !== 0) return cmp;
+    return a.localeCompare(b, "ja", { sensitivity: "base" });
+  });
 
   const secondRowTags: string[] = [];
   if (genrePrimaryTag) secondRowTags.push(genrePrimaryTag);
@@ -142,7 +153,11 @@ export const getAlbumDisplayTags = (
 /**
  * 後方互換用: 2行目タグ一覧を返す
  */
-export const sortAlbumTags = (tags: string[], album: Album): string[] => {
+export const sortAlbumTags = (
+  tags: string[],
+  album: Album,
+  ignoreLeadingThe: boolean = false
+): string[] => {
   const nonArtistTags = tags.filter(
     (t) => t.toLowerCase() !== album.artist.toLowerCase()
   );
@@ -167,7 +182,13 @@ export const sortAlbumTags = (tags: string[], album: Album): string[] => {
     }
   }
 
-  remainingTags.sort((a, b) => a.localeCompare(b));
+  remainingTags.sort((a, b) => {
+    const nameA = ignoreLeadingThe ? stripLeadingThe(a) : a;
+    const nameB = ignoreLeadingThe ? stripLeadingThe(b) : b;
+    const cmp = nameA.localeCompare(nameB, "ja", { sensitivity: "base" });
+    if (cmp !== 0) return cmp;
+    return a.localeCompare(b, "ja", { sensitivity: "base" });
+  });
 
   const sorted: string[] = [];
   if (genreTag) sorted.push(genreTag);
@@ -186,6 +207,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
   onPlayAlbum,
   onQueueAlbum,
   onToggleTag,
+  ignoreLeadingThe = false,
 }) => {
   const { t } = useTranslation();
 
@@ -248,7 +270,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
         {albums.map((album) => {
           const coverSrc = album.cover_url ? convertFileSrc(album.cover_url) : null;
-          const { artistPrimaryTag, secondRowTags } = getAlbumDisplayTags(album, availableTags);
+          const { artistPrimaryTag, secondRowTags } = getAlbumDisplayTags(album, availableTags, ignoreLeadingThe);
           const primarySet = new Set((album.primary_tags || []).map((t) => t.toLowerCase()));
 
           return (

@@ -245,6 +245,8 @@ export const ja: Translations = {
     textSize: "文字サイズ",
     textSizeStandard: "標準",
     textSizeLarge: "拡大",
+    ignoreLeadingThe: "アーティストタグソート時、頭のTheを無視する",
+    ignoreLeadingTheHint: "「The Beatles」などを「Beatles」としてアルファベット順に並べます",
   },
 };
 

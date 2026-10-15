@@ -46,6 +46,7 @@ import { AlbumSortSelect } from "./components/AlbumSortSelect";
 import { TrackSortSelect } from "./components/TrackSortSelect";
 import { SettingsModal } from "./components/SettingsModal";
 import { useTranslation } from "./i18n";
+import { getStoredIgnoreLeadingThe, compareArtistText } from "./utils/sortUtils";
 import "./App.css";
 
 function App() {
@@ -58,6 +59,7 @@ function App() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [matchAll, setMatchAll] = useState(true); // AND vs OR
+  const [ignoreLeadingThe, setIgnoreLeadingThe] = useState<boolean>(getStoredIgnoreLeadingThe);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
 
@@ -787,8 +789,21 @@ function App() {
       return yA - yB;
     };
 
+    const getAlbumArtist = (album: Album): string => {
+      const primarySet = new Set((album.primary_tags ?? []).map((t) => t.toLowerCase()));
+      for (const tag of album.tags) {
+        if (primarySet.has(tag.toLowerCase())) {
+          const cat = tagCategoryMap.get(tag.toLowerCase());
+          if (cat === "artist") {
+            return tag;
+          }
+        }
+      }
+      return album.artist || "";
+    };
+
     return [...filteredAlbums].sort((a, b) => {
-      const cmpArtist = compareText(a.artist, b.artist);
+      const cmpArtist = compareArtistText(getAlbumArtist(a), getAlbumArtist(b), ignoreLeadingThe);
       const cmpTitle = compareText(a.title, b.title);
       const cmpYear = compareYear(getAlbumReleaseYear(a), getAlbumReleaseYear(b));
       const cmpGenre = compareText(a.genre, b.genre);
@@ -810,7 +825,7 @@ function App() {
           return 0;
       }
     });
-  }, [filteredAlbums, albumSortOrder, tagCategoryMap]);
+  }, [filteredAlbums, albumSortOrder, tagCategoryMap, ignoreLeadingThe]);
 
   // 曲一覧のソート順
   const [trackSortOrder, setTrackSortOrder] = useState<TrackSortOrder>(() => {
@@ -857,13 +872,13 @@ function App() {
         if (cmpTitle !== 0) return cmpTitle;
         const artistA = a.artist || a.album_artist;
         const artistB = b.artist || b.album_artist;
-        return compareText(artistA, artistB);
+        return compareArtistText(artistA, artistB, ignoreLeadingThe);
       }
 
       // "artist-album-disc-track": アーティスト > アルバムタイトル > ディスク > トラック
       const artistA = a.artist || a.album_artist;
       const artistB = b.artist || b.album_artist;
-      const cmpArtist = compareText(artistA, artistB);
+      const cmpArtist = compareArtistText(artistA, artistB, ignoreLeadingThe);
       if (cmpArtist !== 0) return cmpArtist;
 
       const cmpAlbum = compareText(a.album_title, b.album_title);
@@ -879,7 +894,7 @@ function App() {
 
       return compareText(a.title, b.title);
     });
-  }, [filteredTagTracks, trackSortOrder]);
+  }, [filteredTagTracks, trackSortOrder, ignoreLeadingThe]);
 
   const formatTime = (secs: number) => {
     const safeSecs = Math.max(0, Math.floor(secs));
@@ -957,6 +972,7 @@ function App() {
           playlists={playlists}
           onPlayPlaylist={handlePlaySavedPlaylist}
           onDeletePlaylist={handleDeletePlaylist}
+          ignoreLeadingThe={ignoreLeadingThe}
         />
 
         {/* Content Area */}
@@ -1133,6 +1149,7 @@ function App() {
                 onPlayAlbum={handlePlayAlbum}
                 onQueueAlbum={handleQueueAlbum}
                 onToggleTag={handleToggleTag}
+                ignoreLeadingThe={ignoreLeadingThe}
               />
             ) : (
               <TrackList
@@ -1186,6 +1203,7 @@ function App() {
             loadTagTracks(selectedTags, matchAll);
           }
         }}
+        ignoreLeadingThe={ignoreLeadingThe}
       />
 
       {/* Playback Queue Modal */}
@@ -1216,6 +1234,8 @@ function App() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        ignoreLeadingThe={ignoreLeadingThe}
+        onSaveIgnoreLeadingThe={setIgnoreLeadingThe}
       />
 
       {/* Bottom Player Controls */}

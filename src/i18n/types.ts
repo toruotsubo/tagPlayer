@@ -227,6 +227,8 @@ export interface Translations {
     textSize: string;
     textSizeStandard: string;
     textSizeLarge: string;
+    ignoreLeadingThe: string;
+    ignoreLeadingTheHint: string;
   };
 }
 

@@ -40,6 +40,7 @@ interface AlbumDetailModalProps {
   onDeleteAlbum?: (albumId: number) => Promise<void>;
   onAlbumUpdated?: (album: Album) => void;
   onTagsChanged?: () => void;
+  ignoreLeadingThe?: boolean;
 }
 
 export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
@@ -58,6 +59,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   onDeleteAlbum,
   onAlbumUpdated,
   onTagsChanged,
+  ignoreLeadingThe = false,
 }) => {
   const { t } = useTranslation();
   const queuedTrackIds = useMemo(() => new Set(queue.map((t) => t.id)), [queue]);
@@ -587,7 +589,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                 </h2>
 
                 {(() => {
-                  const { artistPrimaryTag, secondRowTags } = getAlbumDisplayTags(activeAlbum, availableTags);
+                  const { artistPrimaryTag, secondRowTags } = getAlbumDisplayTags(activeAlbum, availableTags, ignoreLeadingThe);
                   const primarySet = new Set((activeAlbum.primary_tags || []).map((t) => t.toLowerCase()));
 
                   return (

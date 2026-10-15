@@ -13,6 +13,7 @@ import {
 import { Playlist, TagCategory, TagItem, categoryDotClasses } from "../types/music";
 import { useTranslation } from "../i18n";
 import { TagSortSelect, TagSortOrder } from "./TagSortSelect";
+import { compareTagItems } from "../utils/sortUtils";
 
 export type { TagSortOrder };
 
@@ -29,6 +30,7 @@ interface TagSidebarProps {
   playlists: Playlist[];
   onPlayPlaylist: (playlist: Playlist) => void;
   onDeletePlaylist: (playlistId: number) => void;
+  ignoreLeadingThe?: boolean;
 }
 
 export const TagSidebar: React.FC<TagSidebarProps> = ({
@@ -44,6 +46,7 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
   playlists,
   onPlayPlaylist,
   onDeletePlaylist,
+  ignoreLeadingThe = false,
 }) => {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,27 +82,10 @@ export const TagSidebar: React.FC<TagSidebarProps> = ({
   });
 
   const sortedTags = useMemo(() => {
-    return [...filteredTags].sort((a, b) => {
-      switch (tagSortOrder) {
-        case "count-asc":
-          if (a.count !== b.count) {
-            return a.count - b.count;
-          }
-          return a.name.localeCompare(b.name, "ja", { sensitivity: "base" });
-        case "count-desc":
-          if (a.count !== b.count) {
-            return b.count - a.count;
-          }
-          return a.name.localeCompare(b.name, "ja", { sensitivity: "base" });
-        case "name-asc":
-          return a.name.localeCompare(b.name, "ja", { sensitivity: "base" });
-        case "name-desc":
-          return b.name.localeCompare(a.name, "ja", { sensitivity: "base" });
-        default:
-          return 0;
-      }
-    });
-  }, [filteredTags, tagSortOrder]);
+    return [...filteredTags].sort((a, b) =>
+      compareTagItems(a, b, tagSortOrder, Boolean(ignoreLeadingThe))
+    );
+  }, [filteredTags, tagSortOrder, ignoreLeadingThe]);
 
   return (
     <aside className="w-72 border-r border-zinc-800/80 bg-zinc-900/40 p-4 flex flex-col gap-3.5 overflow-hidden select-none">

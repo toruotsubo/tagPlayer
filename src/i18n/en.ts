@@ -247,6 +247,8 @@ export const en: Translations = {
     textSize: "Text Size",
     textSizeStandard: "Standard",
     textSizeLarge: "Large",
+    ignoreLeadingThe: "Ignore leading 'The' when sorting artist tags",
+    ignoreLeadingTheHint: "Sorts names like 'The Beatles' under 'Beatles'",
   },
 };
 

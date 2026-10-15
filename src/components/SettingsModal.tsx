@@ -1,28 +1,35 @@
 import React, { useState, useEffect } from "react";
-import { Settings, X, Globe, Check, Type } from "lucide-react";
+import { Settings, X, Globe, Check, Type, ArrowUpDown } from "lucide-react";
 import { useTranslation, LanguageSetting } from "../i18n";
 import { getStoredTextSize, applyTextSize, TextSizeSetting } from "../hooks/useTextSize";
+import { saveIgnoreLeadingThe } from "../utils/sortUtils";
 
 export interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  ignoreLeadingThe: boolean;
+  onSaveIgnoreLeadingThe: (value: boolean) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
+  ignoreLeadingThe,
+  onSaveIgnoreLeadingThe,
 }) => {
   const { t, languageSetting, setLanguageSetting, detectedLanguage } = useTranslation();
   const [selectedSetting, setSelectedSetting] = useState<LanguageSetting>(languageSetting);
   const [selectedTextSize, setSelectedTextSize] = useState<TextSizeSetting>(getStoredTextSize);
+  const [selectedIgnoreLeadingThe, setSelectedIgnoreLeadingThe] = useState<boolean>(ignoreLeadingThe);
 
   // モーダルが開くたびに現在の設定を反映
   useEffect(() => {
     if (isOpen) {
       setSelectedSetting(languageSetting);
       setSelectedTextSize(getStoredTextSize());
+      setSelectedIgnoreLeadingThe(ignoreLeadingThe);
     }
-  }, [isOpen, languageSetting]);
+  }, [isOpen, languageSetting, ignoreLeadingThe]);
 
   // Escキーで閉じる
   useEffect(() => {
@@ -41,6 +48,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleSave = () => {
     setLanguageSetting(selectedSetting);
     applyTextSize(selectedTextSize);
+    saveIgnoreLeadingThe(selectedIgnoreLeadingThe);
+    onSaveIgnoreLeadingThe(selectedIgnoreLeadingThe);
     onClose();
   };
 
@@ -192,6 +201,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 );
               })}
             </div>
+          </div>
+
+          {/* ソート設定 */}
+          <div className="pt-2 border-t border-zinc-800/80">
+            <label className="text-xs font-semibold text-zinc-300 flex items-center gap-2 mb-2.5">
+              <ArrowUpDown className="h-4 w-4 text-indigo-400" />
+              <span>{t.sidebar.sortLabel}</span>
+            </label>
+
+            <label
+              className={`flex items-start gap-3 p-3 rounded-xl border text-left transition cursor-pointer select-none ${
+                selectedIgnoreLeadingThe
+                  ? "bg-indigo-600/15 border-indigo-500/60 text-zinc-100 shadow-xs"
+                  : "bg-zinc-950/50 border-zinc-800/80 hover:bg-zinc-800/50 text-zinc-300"
+              }`}
+            >
+              <div className="pt-0.5 shrink-0">
+                <input
+                  type="checkbox"
+                  checked={selectedIgnoreLeadingThe}
+                  onChange={(e) => setSelectedIgnoreLeadingThe(e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-zinc-900 cursor-pointer accent-indigo-600"
+                />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-zinc-100">
+                  {t.settings.ignoreLeadingThe}
+                </span>
+                <span className="text-[11px] text-zinc-400 mt-0.5">
+                  {t.settings.ignoreLeadingTheHint}
+                </span>
+              </div>
+            </label>
           </div>
         </div>
 
