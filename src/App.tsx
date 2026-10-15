@@ -47,6 +47,7 @@ import { TrackSortSelect } from "./components/TrackSortSelect";
 import { SettingsModal } from "./components/SettingsModal";
 import { useTranslation } from "./i18n";
 import { getStoredIgnoreLeadingThe, compareArtistText } from "./utils/sortUtils";
+import { generateDecadeTags, albumMatchesTag, isDecadeTag } from "./utils/decadeUtils";
 import "./App.css";
 
 function App() {
@@ -698,17 +699,23 @@ function App() {
     return "artist-title-year";
   });
 
+  // 既存のタグに加えて、リリース年（1950〜1959等）から10年刻みの年代タグ（1950s等）を自動生成
+  const allTags = useMemo(() => {
+    const decadeTags = generateDecadeTags(library.albums, library.tags);
+    return [...library.tags, ...decadeTags];
+  }, [library.albums, library.tags]);
+
   // アルバム一覧の絞り込み（タグ選択 ＆ アルバム検索: タイトルとタグ）
   const filteredAlbums = useMemo(() => {
     const query = albumSearchQuery.trim().toLowerCase();
     const queryTerms = query ? query.split(/\s+/).filter(Boolean) : [];
 
     return library.albums.filter((album) => {
-      // タグ選択による絞り込み
+      // タグ選択による絞り込み（年代タグ含む）
       if (selectedTags.length > 0) {
         const matchesTags = matchAll
-          ? selectedTags.every((tag) => album.tags.includes(tag))
-          : selectedTags.some((tag) => album.tags.includes(tag));
+          ? selectedTags.every((tag) => albumMatchesTag(album, tag))
+          : selectedTags.some((tag) => albumMatchesTag(album, tag));
         if (!matchesTags) return false;
       }
 
@@ -730,11 +737,11 @@ function App() {
   // タグ名 -> カテゴリのマップ
   const tagCategoryMap = useMemo(() => {
     const map = new Map<string, TagCategory>();
-    for (const tag of library.tags) {
+    for (const tag of allTags) {
       map.set(tag.name.toLowerCase(), tag.category);
     }
     return map;
-  }, [library.tags]);
+  }, [allTags]);
 
   // アルバム一覧のソート処理
   const sortedAlbums = useMemo(() => {
@@ -960,7 +967,7 @@ function App() {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <TagSidebar
-          tags={library.tags}
+          tags={allTags}
           viewMode={viewMode}
           selectedTags={selectedTags}
           matchAll={matchAll}
@@ -1114,8 +1121,8 @@ function App() {
                 <span>{t.app.selectedTagsPrefix}</span>
                 <div className="flex items-center gap-1 flex-wrap">
                   {selectedTags.map((tag) => {
-                    const tagItem = library.tags.find((item) => item.name === tag);
-                    const category = tagItem?.category || "other";
+                    const tagItem = allTags.find((item) => item.name === tag);
+                    const category = tagItem?.category || (isDecadeTag(tag) ? "release_year" : "other");
                     return (
                       <span
                         key={tag}
@@ -1142,7 +1149,7 @@ function App() {
                 albums={sortedAlbums}
                 searchQuery={albumSearchQuery}
                 selectedTags={selectedTags}
-                availableTags={library.tags}
+                availableTags={allTags}
                 currentPlayingTrackId={currentTrack?.id}
                 isPlaying={isPlaying}
                 onOpenAlbumModal={handleOpenAlbumModal}
@@ -1156,7 +1163,7 @@ function App() {
                 tracks={sortedTagTracks}
                 searchQuery={trackSearchQuery}
                 selectedTags={selectedTags}
-                availableTags={library.tags}
+                availableTags={allTags}
                 queue={queue}
                 loading={loadingTagTracks}
                 currentPlayingTrackId={currentTrack?.id}

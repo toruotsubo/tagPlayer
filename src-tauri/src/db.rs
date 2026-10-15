@@ -400,6 +400,22 @@ pub fn get_all_tags(conn: &Connection) -> Result<Vec<TagItem>> {
     Ok(tags)
 }
 
+/// 年代タグ（例: "1950s"）を判定し、(開始年, 終了年) を返す。
+pub fn parse_decade_tag(tag: &str) -> Option<(u32, u32)> {
+    let trimmed = tag.trim();
+    if (trimmed.ends_with('s') || trimmed.ends_with('S')) && trimmed.len() == 5 {
+        let year_str = &trimmed[..4];
+        if year_str.ends_with('0') {
+            if let Ok(year) = year_str.parse::<u32>() {
+                if (1000..=2999).contains(&year) {
+                    return Some((year, year + 9));
+                }
+            }
+        }
+    }
+    None
+}
+
 pub fn get_tracks_by_tags(
     conn: &Connection,
     tags: &[String],
@@ -442,66 +458,72 @@ pub fn get_tracks_by_tags(
         return Ok(tracks);
     }
 
-    // タグ名リストから tag_id を取得
-    let mut tag_ids = Vec::new();
+    let mut conditions = Vec::new();
+
     for name in tags {
-        let res: Result<i64, _> = conn.query_row(
-            "SELECT id FROM tags WHERE name = ?1 COLLATE NOCASE",
-            params![name.trim()],
-            |row| row.get(0),
-        );
-        if let Ok(id) = res {
-            tag_ids.push(id);
-        } else if match_all {
-            // 存在しないタグがAND条件にある場合は0件確定
-            return Ok(Vec::new());
+        let trimmed = name.trim();
+        if let Some((start, end)) = parse_decade_tag(trimmed) {
+            // 年代タグ: 該当する年のタグID一覧を取得
+            let mut decade_tag_ids = Vec::new();
+            if let Ok(mut stmt) = conn.prepare("SELECT id, name FROM tags WHERE category = 'release_year'") {
+                if let Ok(rows) = stmt.query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))) {
+                    for r in rows.flatten() {
+                        if let Ok(y) = r.1.trim().parse::<u32>() {
+                            if (start..=end).contains(&y) {
+                                decade_tag_ids.push(r.0);
+                            }
+                        }
+                    }
+                }
+            }
+
+            let cond = if decade_tag_ids.is_empty() {
+                format!("(a.release_year >= {} AND a.release_year <= {})", start, end)
+            } else {
+                let id_list = decade_tag_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(",");
+                format!(
+                    "((a.release_year >= {} AND a.release_year <= {}) OR t.id IN (SELECT track_id FROM track_tags WHERE tag_id IN ({})) OR a.id IN (SELECT album_id FROM album_tags WHERE tag_id IN ({})))",
+                    start, end, id_list, id_list
+                )
+            };
+            conditions.push(cond);
+        } else {
+            // 通常タグ
+            let res: Result<i64, _> = conn.query_row(
+                "SELECT id FROM tags WHERE name = ?1 COLLATE NOCASE",
+                params![trimmed],
+                |row| row.get(0),
+            );
+            if let Ok(id) = res {
+                conditions.push(format!(
+                    "(t.id IN (SELECT track_id FROM track_tags WHERE tag_id = {}) OR a.id IN (SELECT album_id FROM album_tags WHERE tag_id = {}))",
+                    id, id
+                ));
+            } else if match_all {
+                // 存在しない通常タグがAND条件にある場合は0件確定
+                return Ok(Vec::new());
+            }
         }
     }
 
-    if tag_ids.is_empty() {
+    if conditions.is_empty() {
         return Ok(Vec::new());
     }
 
-    let query = if match_all {
-        format!(
-            "
-            SELECT t.id, t.album_id, t.title, t.artist, t.composer, t.track_number, t.disc_number, t.duration_secs, t.file_path,
-                   a.title as album_title, a.artist as album_artist, a.cover_url
-            FROM tracks t
-            JOIN albums a ON t.album_id = a.id
-            WHERE t.id IN (
-                SELECT t_sub.id
-                FROM tracks t_sub
-                JOIN (
-                    SELECT tt.track_id as t_id, tt.tag_id FROM track_tags tt
-                    UNION
-                    SELECT tr.id as t_id, at.tag_id FROM tracks tr JOIN album_tags at ON tr.album_id = at.album_id
-                ) mapping ON t_sub.id = mapping.t_id
-                WHERE mapping.tag_id IN ({})
-                GROUP BY t_sub.id
-                HAVING COUNT(DISTINCT mapping.tag_id) = {}
-            )
-            ORDER BY a.artist COLLATE NOCASE, a.title COLLATE NOCASE, COALESCE(t.disc_number, 1), COALESCE(t.track_number, 9999), t.title COLLATE NOCASE
-            ",
-            tag_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(","),
-            tag_ids.len()
-        )
-    } else {
-        format!(
-            "
-            SELECT DISTINCT t.id, t.album_id, t.title, t.artist, t.composer, t.track_number, t.disc_number, t.duration_secs, t.file_path,
-                   a.title as album_title, a.artist as album_artist, a.cover_url
-            FROM tracks t
-            JOIN albums a ON t.album_id = a.id
-            LEFT JOIN track_tags tt ON t.id = tt.track_id
-            LEFT JOIN album_tags at ON a.id = at.album_id
-            WHERE tt.tag_id IN ({}) OR at.tag_id IN ({})
-            ORDER BY a.artist COLLATE NOCASE, a.title COLLATE NOCASE, COALESCE(t.disc_number, 1), COALESCE(t.track_number, 9999), t.title COLLATE NOCASE
-            ",
-            tag_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(","),
-            tag_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(",")
-        )
-    };
+    let join_operator = if match_all { " AND " } else { " OR " };
+    let where_clause = conditions.join(join_operator);
+
+    let query = format!(
+        "
+        SELECT DISTINCT t.id, t.album_id, t.title, t.artist, t.composer, t.track_number, t.disc_number, t.duration_secs, t.file_path,
+               a.title as album_title, a.artist as album_artist, a.cover_url
+        FROM tracks t
+        JOIN albums a ON t.album_id = a.id
+        WHERE {}
+        ORDER BY a.artist COLLATE NOCASE, a.title COLLATE NOCASE, COALESCE(t.disc_number, 1), COALESCE(t.track_number, 9999), t.title COLLATE NOCASE
+        ",
+        where_clause
+    );
 
     let mut stmt = conn.prepare(&query)?;
     let rows = stmt.query_map([], |row| {

@@ -1,5 +1,6 @@
 import { TagItem } from "../types/music";
 import { TagSortOrder } from "../components/TagSortSelect";
+import { compareReleaseYearValue } from "./decadeUtils";
 
 const STORAGE_KEY = "tagPlayer_ignoreLeadingThe";
 
@@ -81,6 +82,10 @@ export function compareTagItems(
   };
 
   const compareName = (x: TagItem, y: TagItem) => {
+    if (x.category === "release_year" && y.category === "release_year") {
+      const yearCmp = compareReleaseYearValue(x.name, y.name);
+      if (yearCmp !== null) return yearCmp;
+    }
     const nX = getSortName(x);
     const nY = getSortName(y);
     const cmp = nX.localeCompare(nY, "ja", { sensitivity: "base" });
