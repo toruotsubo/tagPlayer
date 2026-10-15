@@ -61,6 +61,7 @@ export const ja: Translations = {
       `「${title}」の ${count} 曲をキューに追加しました`,
     tracksAddedToQueue: (count: number) => `${count} 曲をキューに追加しました`,
     albumDeleted: (title: string) => `「${title}」をライブラリから削除しました`,
+    alreadyAllQueued: "対象の曲はすべて既にキューに追加されています",
   },
   sidebar: {
     tagsTab: "タグ",
@@ -149,7 +150,7 @@ export const ja: Translations = {
     cancelButton: "キャンセル",
     emptyQueueTitle: "再生キューが空です",
     emptyQueueSub:
-      "曲を再生するか、タグやアルバムからキューに追加してください",
+      "タグ、アルバム、曲を再生するか、キューに追加してください",
     dragHandleTip: "ドラッグして順位を入れ替え",
     nowPlayingBadge: "再生中",
     removeTrackTip: "キューから削除",

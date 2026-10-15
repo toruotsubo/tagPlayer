@@ -198,16 +198,11 @@ export const QueueModal: React.FC<QueueModalProps> = ({
             <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
               <ListMusic className="h-5 w-5" />
             </div>
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-zinc-100 shrink-0">{t.queueModal.title}</h2>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full border border-zinc-700/80 bg-zinc-950/60 text-[10px] font-mono text-zinc-400 shrink-0">
-                  {t.queueModal.queueCountAndDuration(queue.length, Math.floor(totalDurationSecs / 60))}
-                </span>
-              </div>
-              <p className="text-[11px] text-zinc-400 truncate mt-0.5">
-                {t.queueModal.description}
-              </p>
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="text-base font-bold text-zinc-100 shrink-0">{t.queueModal.title}</h2>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full border border-zinc-700/80 bg-zinc-950/60 text-[10px] font-mono text-zinc-400 shrink-0">
+                {t.queueModal.queueCountAndDuration(queue.length, Math.floor(totalDurationSecs / 60))}
+              </span>
             </div>
           </div>
 
@@ -393,10 +388,14 @@ export const QueueModal: React.FC<QueueModalProps> = ({
 
         {/* Footer */}
         <div className="px-5 py-3 bg-zinc-950/60 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-500 shrink-0">
-          <span className="flex items-center gap-1.5">
-            <span>💡</span>
-            <span>{t.queueModal.footerHint}</span>
-          </span>
+          {queue.length > 0 ? (
+            <span className="flex items-center gap-1.5">
+              <span>💡</span>
+              <span>{t.queueModal.footerHint}</span>
+            </span>
+          ) : (
+            <span />
+          )}
           <button
             onClick={onClose}
             className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition cursor-pointer active:scale-95 shadow-xs"

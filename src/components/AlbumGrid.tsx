@@ -213,6 +213,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
 
   const handlePlayAlbumClick = async (e: React.MouseEvent, album: Album) => {
     e.stopPropagation();
+    (e.currentTarget as HTMLElement)?.blur();
     try {
       const albumTracks = await invoke<Track[]>("get_album_tracks", { albumId: album.id });
       onPlayAlbum?.(album, albumTracks);
@@ -223,6 +224,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
 
   const handleQueueAlbumClick = async (e: React.MouseEvent, album: Album) => {
     e.stopPropagation();
+    (e.currentTarget as HTMLElement)?.blur();
     try {
       const albumTracks = await invoke<Track[]>("get_album_tracks", { albumId: album.id });
       onQueueAlbum?.(album, albumTracks);
@@ -233,6 +235,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
 
   const handleEditTagsClick = (e: React.MouseEvent, album: Album) => {
     e.stopPropagation();
+    (e.currentTarget as HTMLElement)?.blur();
     onOpenAlbumModal?.(album);
   };
 
@@ -276,7 +279,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
           return (
             <div
               key={album.id}
-              className="group flex flex-col bg-zinc-900/30 hover:bg-zinc-900/70 focus-within:bg-zinc-900/70 border border-zinc-800/60 hover:border-zinc-700/80 focus-within:border-zinc-700/80 rounded-xl p-3 transition duration-200 shadow-sm hover:shadow-md focus-within:shadow-md"
+              className="group flex flex-col bg-zinc-900/30 hover:bg-zinc-900/70 border border-zinc-800/60 hover:border-zinc-700/80 rounded-xl p-3 transition duration-200 shadow-sm hover:shadow-md"
             >
               {/* Cover Art */}
               <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-zinc-950/80 border border-zinc-800/40 mb-3 flex items-center justify-center shadow-inner">
@@ -284,15 +287,15 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                   <img
                     src={coverSrc}
                     alt={album.title}
-                    className="h-full w-full object-cover group-hover:scale-105 group-focus-within:scale-105 transition duration-300"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
                     loading="lazy"
                   />
                 ) : (
-                  <Disc3 className="h-12 w-12 text-zinc-700 group-hover:text-indigo-400/80 group-focus-within:text-indigo-400/80 transition duration-300" />
+                  <Disc3 className="h-12 w-12 text-zinc-700 group-hover:text-indigo-400/80 transition duration-300" />
                 )}
                 <div
                   onClick={(e) => e.stopPropagation()}
-                  className="absolute inset-0 bg-black/65 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition duration-200 flex flex-col items-center justify-center gap-1.5 p-3"
+                  className="absolute inset-0 bg-black/65 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition duration-200 flex flex-col items-center justify-center gap-1.5 p-3"
                 >
                   <button
                     type="button"
@@ -327,7 +330,7 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
               {/* Album Info */}
               <div className="flex flex-col gap-1.5 min-w-0">
                 <span
-                  className="text-xs font-semibold text-zinc-100 truncate group-hover:text-indigo-300 group-focus-within:text-indigo-300 transition"
+                  className="text-xs font-semibold text-zinc-100 truncate group-hover:text-indigo-300 transition"
                   title={album.title}
                 >
                   {album.title}

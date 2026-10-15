@@ -62,6 +62,7 @@ export const en: Translations = {
     tracksAddedToQueue: (count: number) =>
       `Added ${count} track${count === 1 ? "" : "s"} to queue`,
     albumDeleted: (title: string) => `Removed "${title}" from library`,
+    alreadyAllQueued: "All tracks are already in the queue",
   },
   sidebar: {
     tagsTab: "Tags",
@@ -151,7 +152,7 @@ export const en: Translations = {
     cancelButton: "Cancel",
     emptyQueueTitle: "Playback queue is empty",
     emptyQueueSub:
-      "Play songs or add them to the queue from tags or albums",
+      "Play tags, albums, or tracks, or add them to the queue",
     dragHandleTip: "Drag to reorder",
     nowPlayingBadge: "Playing",
     removeTrackTip: "Remove from queue",

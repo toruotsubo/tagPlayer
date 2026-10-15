@@ -60,6 +60,7 @@ export interface Translations {
     albumTracksAddedToQueue: (title: string, count: number) => string;
     tracksAddedToQueue: (count: number) => string;
     albumDeleted: (title: string) => string;
+    alreadyAllQueued: string;
   };
   sidebar: {
     tagsTab: string;

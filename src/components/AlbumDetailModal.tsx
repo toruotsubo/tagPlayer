@@ -1048,7 +1048,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                           id={`modal-track-${track.id}`}
                           className={`group py-2.5 px-3 flex items-center justify-between rounded-lg hover:bg-zinc-800/50 transition cursor-pointer text-xs ${
                             isSelected
-                              ? "bg-indigo-950/40 border-l-2 border-indigo-500"
+                              ? "bg-indigo-950/40"
                               : currentPlayingTrackId === track.id
                               ? "bg-indigo-950/25 border-l-2 border-indigo-400"
                               : editingTrackId === track.id

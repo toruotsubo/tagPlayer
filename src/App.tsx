@@ -348,6 +348,11 @@ function App() {
     track: Track | TrackWithAlbum,
     album?: Album
   ) => {
+    if (queue.some((t) => t.id === track.id)) {
+      showToast(t.trackList.queuedTip);
+      return;
+    }
+
     const trackWithAlbum: TrackWithAlbum = {
       ...track,
       album_title: "album_title" in track ? track.album_title : album?.title ?? "",
@@ -384,7 +389,7 @@ function App() {
     }
   };
 
-  // アルバム全曲をキューの末尾に追加
+  // アルバム全曲をキューの末尾に追加（既に追加済みの曲は除外）
   const handleQueueAlbum = (album: Album, albumTracks: Track[]) => {
     const sortedTracks = [...albumTracks].sort((a, b) => {
       const discA = a.disc_number ?? 1;
@@ -396,12 +401,20 @@ function App() {
       return a.title.localeCompare(b.title);
     });
 
-    const items: TrackWithAlbum[] = sortedTracks.map((t) => ({
-      ...t,
-      album_title: album.title,
-      album_artist: album.artist,
-      cover_url: album.cover_url,
-    }));
+    const existingIds = new Set(queue.map((t) => t.id));
+    const items: TrackWithAlbum[] = sortedTracks
+      .filter((t) => !existingIds.has(t.id))
+      .map((t) => ({
+        ...t,
+        album_title: album.title,
+        album_artist: album.artist,
+        cover_url: album.cover_url,
+      }));
+
+    if (items.length === 0) {
+      showToast(t.toast.alreadyAllQueued);
+      return;
+    }
 
     setQueue((prev) => [...prev, ...items]);
     showToast(t.toast.albumTracksAddedToQueue(album.title, items.length));
@@ -414,11 +427,19 @@ function App() {
     handlePlayTrackAtIndex(0, tracks);
   };
 
-  // 一致曲すべてをキューの末尾に追加
+  // 一致曲すべてをキューの末尾に追加（既に追加済みの曲は除外）
   const handleQueueAllTracks = (tracks: TrackWithAlbum[]) => {
     if (tracks.length === 0) return;
-    setQueue((prev) => [...prev, ...tracks]);
-    showToast(t.toast.tracksAddedToQueue(tracks.length));
+    const existingIds = new Set(queue.map((t) => t.id));
+    const items = tracks.filter((t) => !existingIds.has(t.id));
+
+    if (items.length === 0) {
+      showToast(t.toast.alreadyAllQueued);
+      return;
+    }
+
+    setQueue((prev) => [...prev, ...items]);
+    showToast(t.toast.tracksAddedToQueue(items.length));
   };
 
 
@@ -504,7 +525,7 @@ function App() {
     }
   };
 
-  // タグ一致曲をすべてキューに追加
+  // タグ一致曲をすべてキューに追加（既に追加済みの曲は除外）
   const handleQueueSelectedTags = async () => {
     if (selectedTags.length === 0) return;
     try {
@@ -518,8 +539,16 @@ function App() {
         return;
       }
 
-      setQueue((prev) => [...prev, ...tracks]);
-      showToast(t.toast.tracksAddedToQueue(tracks.length));
+      const existingIds = new Set(queue.map((t) => t.id));
+      const items = tracks.filter((t) => !existingIds.has(t.id));
+
+      if (items.length === 0) {
+        showToast(t.toast.alreadyAllQueued);
+        return;
+      }
+
+      setQueue((prev) => [...prev, ...items]);
+      showToast(t.toast.tracksAddedToQueue(items.length));
     } catch (err) {
       console.error("Failed to queue tag tracks", err);
       alert(t.app.queueAddError(err));
@@ -1265,7 +1294,7 @@ function App() {
       {/* Bottom Player Controls */}
       <footer className="h-20 border-t border-zinc-800 bg-zinc-900/90 px-4 flex items-center justify-between backdrop-blur z-20 shadow-2xl">
         {/* Track Info */}
-        <div className="flex items-center gap-3 w-1/4">
+        <div className="flex items-center gap-3 w-1/4 min-w-0">
           <div className="h-12 w-12 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-400 shrink-0 overflow-hidden shadow-inner">
             {coverSrc ? (
               <img src={coverSrc} alt="" className="h-full w-full object-cover" />
@@ -1273,14 +1302,25 @@ function App() {
               <Music2 className="h-5 w-5 text-zinc-500" />
             )}
           </div>
-          <div className="flex flex-col overflow-hidden">
+          <div className="flex flex-col overflow-hidden min-w-0 flex-1">
             <span className="text-xs font-semibold text-zinc-200 truncate">
               {currentTrack?.title ?? t.player.noTrackSelected}
             </span>
             <span className="text-[11px] text-zinc-400 truncate mt-0.5">
-              {currentTrack?.artist || currentTrack?.album_artist || t.player.artistPlaceholder}
+              {currentTrack
+                ? currentTrack.artist || currentTrack.album_artist || ""
+                : "\u00A0"}
             </span>
           </div>
+
+          {currentTrack && queue.length > 0 && currentIndex >= 0 && (
+            <span
+              className="inline-flex items-center px-2 py-0.5 rounded-full border border-zinc-700/70 bg-zinc-950/60 text-[10px] font-mono text-zinc-400 shrink-0 select-none shadow-xs"
+              title={`${currentIndex + 1} / ${queue.length}`}
+            >
+              {`${currentIndex + 1} / ${queue.length}`}
+            </span>
+          )}
         </div>
 
         {/* Controls & Seek Bar */}
