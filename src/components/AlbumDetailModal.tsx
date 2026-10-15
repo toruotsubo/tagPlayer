@@ -387,7 +387,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
       return candidates.slice(0, 5);
     }
     return candidates
-      .filter((t) => t.name.toLowerCase().includes(query))
+      .filter((t) => t.name.toLowerCase().startsWith(query))
       .slice(0, 6);
   }, [availableTags, batchTrackTag, selectedTrackTagsSummary, selectedTrackIds.size]);
 
@@ -405,7 +405,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
       return candidates.slice(0, 5);
     }
     return candidates
-      .filter((t) => t.name.toLowerCase().includes(query))
+      .filter((t) => t.name.toLowerCase().startsWith(query))
       .slice(0, 6);
   }, [activeAlbum, availableTags, newAlbumTag]);
 
@@ -425,7 +425,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
       return candidates.slice(0, 4);
     }
     return candidates
-      .filter((t) => t.name.toLowerCase().includes(query))
+      .filter((t) => t.name.toLowerCase().startsWith(query))
       .slice(0, 5);
   }, [editingTrackId, tracks, availableTags, newTrackTag]);
 
