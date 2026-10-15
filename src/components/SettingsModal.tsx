@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Settings, X, Globe, Check, Type, ArrowUpDown } from "lucide-react";
+import { X, Check, ChevronDown } from "lucide-react";
 import { useTranslation, LanguageSetting } from "../i18n";
 import { getStoredTextSize, applyTextSize, TextSizeSetting } from "../hooks/useTextSize";
 import { saveIgnoreLeadingThe } from "../utils/sortUtils";
@@ -17,7 +17,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   ignoreLeadingThe,
   onSaveIgnoreLeadingThe,
 }) => {
-  const { t, languageSetting, setLanguageSetting, detectedLanguage } = useTranslation();
+  const { t, languageSetting, setLanguageSetting } = useTranslation();
   const [selectedSetting, setSelectedSetting] = useState<LanguageSetting>(languageSetting);
   const [selectedTextSize, setSelectedTextSize] = useState<TextSizeSetting>(getStoredTextSize);
   const [selectedIgnoreLeadingThe, setSelectedIgnoreLeadingThe] = useState<boolean>(ignoreLeadingThe);
@@ -53,42 +53,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onClose();
   };
 
-  const detectedLabel = detectedLanguage === "ja" ? t.settings.languageJa : t.settings.languageEn;
-
   const languageOptions: {
     value: LanguageSetting;
     label: string;
-    subLabel?: string;
   }[] = [
     {
       value: "auto",
       label: t.settings.languageAuto,
-      subLabel: t.settings.languageAutoHint(detectedLabel),
-    },
-    {
-      value: "en",
-      label: t.settings.languageEn,
     },
     {
       value: "ja",
       label: t.settings.languageJa,
+    },
+    {
+      value: "en",
+      label: t.settings.languageEn,
     },
   ];
 
   const textSizeOptions: {
     value: TextSizeSetting;
     label: string;
-    subLabel: string;
   }[] = [
     {
       value: "100%",
       label: "100%",
-      subLabel: t.settings.textSizeStandard,
     },
     {
       value: "110%",
       label: "110%",
-      subLabel: t.settings.textSizeLarge,
     },
   ];
 
@@ -103,71 +96,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       >
         {/* Header */}
         <div className="p-5 border-b border-zinc-800/80 flex items-center justify-between bg-zinc-900/90 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
-              <Settings className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-zinc-100">{t.settings.title}</h2>
-            </div>
-          </div>
+          <h2 className="text-base font-bold text-zinc-100">{t.settings.title}</h2>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
-            title={t.common.close}
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-mono text-zinc-400 select-all">
+              {`v${__APP_VERSION__}`}
+            </span>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
+              title={t.common.close}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
         <div className="p-5 flex flex-col gap-4">
-          {/* 言語設定 */}
-          <div>
-            <label className="text-xs font-semibold text-zinc-300 flex items-center gap-2 mb-2.5">
-              <Globe className="h-4 w-4 text-indigo-400" />
-              <span>{t.settings.language}</span>
-            </label>
-
-            <div className="flex flex-col gap-2">
-              {languageOptions.map((opt) => {
-                const isSelected = selectedSetting === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setSelectedSetting(opt.value)}
-                    className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition cursor-pointer ${
-                      isSelected
-                        ? "bg-indigo-600/15 border-indigo-500/60 text-zinc-100 shadow-xs"
-                        : "bg-zinc-950/50 border-zinc-800/80 hover:bg-zinc-800/50 text-zinc-300"
-                    }`}
-                  >
-                    <div className="flex flex-col">
-                      <span className="text-xs font-medium">{opt.label}</span>
-                      {opt.subLabel && (
-                        <span className="text-[11px] text-zinc-400 mt-0.5">
-                          {opt.subLabel}
-                        </span>
-                      )}
-                    </div>
-                    {isSelected && (
-                      <div className="h-5 w-5 rounded-full bg-indigo-600 flex items-center justify-center text-white shrink-0">
-                        <Check className="h-3 w-3 stroke-[2.5]" />
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* 文字サイズ設定 */}
-          <div className="pt-2 border-t border-zinc-800/80">
-            <label className="text-xs font-semibold text-zinc-300 flex items-center gap-2 mb-2.5">
-              <Type className="h-4 w-4 text-indigo-400" />
-              <span>{t.settings.textSize}</span>
+          <div>
+            <label className="text-xs font-semibold text-zinc-300 block mb-2.5">
+              {t.settings.textSize}
             </label>
 
             <div className="grid grid-cols-2 gap-2">
@@ -184,14 +134,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         : "bg-zinc-950/50 border-zinc-800/80 hover:bg-zinc-800/50 text-zinc-300"
                     }`}
                   >
-                    <div className="flex flex-col">
-                      <span className={`font-semibold tracking-wide ${opt.value === "110%" ? "text-sm" : "text-xs"}`}>
-                        {opt.label}
-                      </span>
-                      <span className="text-[11px] text-zinc-400 mt-0.5">
-                        {opt.subLabel}
-                      </span>
-                    </div>
+                    <span className="text-xs font-semibold tracking-wide">
+                      {opt.label}
+                    </span>
                     {isSelected && (
                       <div className="h-5 w-5 rounded-full bg-indigo-600 flex items-center justify-center text-white shrink-0">
                         <Check className="h-3 w-3 stroke-[2.5]" />
@@ -203,11 +148,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* ソート設定 */}
+          {/* タグの並び順設定 */}
           <div className="pt-2 border-t border-zinc-800/80">
-            <label className="text-xs font-semibold text-zinc-300 flex items-center gap-2 mb-2.5">
-              <ArrowUpDown className="h-4 w-4 text-indigo-400" />
-              <span>{t.sidebar.sortLabel}</span>
+            <label className="text-xs font-semibold text-zinc-300 block mb-2.5">
+              {t.sidebar.sortLabel}
             </label>
 
             <label
@@ -234,6 +178,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </span>
               </div>
             </label>
+          </div>
+
+          {/* 言語設定 */}
+          <div className="pt-2 border-t border-zinc-800/80">
+            <label className="text-xs font-semibold text-zinc-300 block mb-2.5">
+              {t.settings.language}
+            </label>
+
+            <div className="relative">
+              <select
+                value={selectedSetting}
+                onChange={(e) => setSelectedSetting(e.target.value as LanguageSetting)}
+                className="w-full appearance-none bg-zinc-950/60 border border-zinc-800/80 rounded-xl px-3.5 py-2.5 text-xs text-zinc-200 font-medium hover:border-zinc-700 focus:outline-hidden focus:border-indigo-500/80 focus:ring-1 focus:ring-indigo-500/50 transition cursor-pointer pr-10"
+              >
+                {languageOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value} className="bg-zinc-900 text-zinc-100">
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-zinc-400">
+                <ChevronDown className="h-4 w-4" />
+              </div>
+            </div>
           </div>
         </div>
 
