@@ -230,5 +230,13 @@ export interface Translations {
     ignoreLeadingThe: string;
     ignoreLeadingTheHint: string;
   };
+  playbackErrorModal: {
+    fileNotFoundTitle: string;
+    fileNotFoundMessage: string;
+    generalErrorTitle: string;
+    generalErrorMessage: string;
+    filePathLabel: string;
+    errorDetailsLabel: string;
+  };
 }
 

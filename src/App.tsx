@@ -45,6 +45,7 @@ import { AlbumDetailModal } from "./components/AlbumDetailModal";
 import { AlbumSortSelect } from "./components/AlbumSortSelect";
 import { TrackSortSelect } from "./components/TrackSortSelect";
 import { SettingsModal } from "./components/SettingsModal";
+import { PlaybackErrorModal, PlaybackErrorInfo } from "./components/PlaybackErrorModal";
 import { useTranslation } from "./i18n";
 import { getStoredIgnoreLeadingThe, compareArtistText } from "./utils/sortUtils";
 import { generateDecadeTags, albumMatchesTag, isDecadeTag } from "./utils/decadeUtils";
@@ -98,6 +99,39 @@ function App() {
     toastTimeoutRef.current = setTimeout(() => {
       setToastMessage(null);
     }, 2500);
+  };
+
+  // Playback Error Modal state
+  const [playbackError, setPlaybackError] = useState<PlaybackErrorInfo | null>(null);
+
+  const showPlaybackError = (
+    track?: Track | TrackWithAlbum | null,
+    err?: unknown
+  ) => {
+    const rawErrorStr =
+      typeof err === "string"
+        ? err
+        : err instanceof Error
+        ? err.message
+        : String(err ?? "");
+    const isFileNotFound =
+      rawErrorStr.includes("ファイルが存在しません") ||
+      rawErrorStr.toLowerCase().includes("not found");
+
+    setPlaybackError({
+      trackTitle: track?.title,
+      artist: track
+        ? "artist" in track && track.artist
+          ? track.artist
+          : "album_artist" in track
+          ? track.album_artist
+          : undefined
+        : undefined,
+      albumTitle: track && "album_title" in track ? track.album_title : undefined,
+      filePath: track?.file_path,
+      rawError: err,
+      isFileNotFound,
+    });
   };
 
   const isSeeking = useRef(false);
@@ -281,7 +315,7 @@ function App() {
     } catch (err) {
       console.error("Play track error", err);
       setIsPlaying(false);
-      alert(t.app.playError(err));
+      showPlaybackError(track, err);
     }
   };
 
@@ -346,18 +380,7 @@ function App() {
 
     setQueue(albumQueue);
     if (albumQueue.length > 0) {
-      setCurrentIndex(0);
-      setPositionSecs(0);
-      setDurationSecs(albumQueue[0].duration_secs);
-      try {
-        await invoke<PlaybackStatus>("play_track", {
-          filePath: albumQueue[0].file_path,
-        });
-        setIsPlaying(true);
-      } catch (err) {
-        console.error("Failed to play album", err);
-        setIsPlaying(false);
-      }
+      handlePlayTrackAtIndex(0, albumQueue);
     }
   };
 
@@ -473,18 +496,11 @@ function App() {
       }
 
       setQueue(tracks);
-      setCurrentIndex(0);
-      setPositionSecs(0);
-      setDurationSecs(tracks[0].duration_secs);
-
-      await invoke<PlaybackStatus>("play_track", {
-        filePath: tracks[0].file_path,
-      });
-      setIsPlaying(true);
+      handlePlayTrackAtIndex(0, tracks);
     } catch (err) {
       console.error("Failed to generate tag playlist", err);
       setIsPlaying(false);
-      alert(t.app.playlistGenError(err));
+      showPlaybackError(null, err);
     }
   };
 
@@ -523,17 +539,11 @@ function App() {
       }
 
       setQueue(tracks);
-      setCurrentIndex(0);
-      setPositionSecs(0);
-      setDurationSecs(tracks[0].duration_secs);
-
-      await invoke<PlaybackStatus>("play_track", {
-        filePath: tracks[0].file_path,
-      });
-      setIsPlaying(true);
+      handlePlayTrackAtIndex(0, tracks);
     } catch (err) {
       console.error("Failed to play saved playlist", err);
       setIsPlaying(false);
+      showPlaybackError(null, err);
     }
   };
 
@@ -1243,6 +1253,13 @@ function App() {
         onClose={() => setIsSettingsOpen(false)}
         ignoreLeadingThe={ignoreLeadingThe}
         onSaveIgnoreLeadingThe={setIgnoreLeadingThe}
+      />
+
+      {/* Playback Error Modal */}
+      <PlaybackErrorModal
+        isOpen={playbackError !== null}
+        onClose={() => setPlaybackError(null)}
+        error={playbackError}
       />
 
       {/* Bottom Player Controls */}

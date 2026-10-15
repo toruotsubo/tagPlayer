@@ -250,5 +250,14 @@ export const en: Translations = {
     ignoreLeadingThe: "Ignore leading 'The' when sorting artist tags",
     ignoreLeadingTheHint: "Sorts names like 'The Beatles' under 'Beatles'",
   },
+  playbackErrorModal: {
+    fileNotFoundTitle: "File Not Found",
+    fileNotFoundMessage:
+      "The audio file could not be found. It may have been moved, renamed, or deleted.",
+    generalErrorTitle: "Playback Error",
+    generalErrorMessage: "An error occurred while attempting to play the audio file.",
+    filePathLabel: "File Path",
+    errorDetailsLabel: "Error Details",
+  },
 };
 

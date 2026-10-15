@@ -248,5 +248,14 @@ export const ja: Translations = {
     ignoreLeadingThe: "アーティストタグソート時、頭のTheを無視する",
     ignoreLeadingTheHint: "「The Beatles」などを「Beatles」としてアルファベット順に並べます",
   },
+  playbackErrorModal: {
+    fileNotFoundTitle: "ファイルが見つかりません",
+    fileNotFoundMessage:
+      "再生対象の音楽ファイルが見つかりませんでした。ファイルが移動または削除された可能性があります。",
+    generalErrorTitle: "再生エラー",
+    generalErrorMessage: "音楽ファイルの再生開始時にエラーが発生しました。",
+    filePathLabel: "ファイルパス",
+    errorDetailsLabel: "エラー詳細",
+  },
 };
 
