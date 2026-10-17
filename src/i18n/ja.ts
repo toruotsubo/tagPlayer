@@ -198,7 +198,9 @@ export const ja: Translations = {
       `${selected} / ${total} 曲選択中`,
     deselectButton: "選択解除",
     batchEditTitle: (count: number) =>
-      `選択した ${count} 曲のタグを一括編集`,
+      count === 1
+        ? "選択した曲のタグ編集"
+        : `選択した ${count} 曲のタグを一括編集`,
     batchRangeHint: "Shift+クリックで曲の範囲選択が可能",
     batchTagPlaceholder: "タグ名を入力...",
     batchTagCategoryAria: "一括追加タグの分類",
@@ -206,7 +208,7 @@ export const ja: Translations = {
     batchAddTagSuggestTip: (count: number, name: string) =>
       `選択中の ${count} 曲に「${name}」を一括追加`,
     batchAttachedTagsLabel:
-      "選択曲に付いているタグ (×で選択曲から一括削除):",
+      "選択曲に付いているタグ (×で削除):",
     batchRemoveTagTip: (name: string) =>
       `選択したすべての曲から「${name}」を一括削除`,
     trackSelectionCheckboxTip:

@@ -159,7 +159,7 @@ export const TrackList: React.FC<TrackListProps> = ({
             <div
               key={`${track.id}-${idx}`}
               className={`group py-2.5 px-3 rounded-lg flex items-center justify-between gap-4 transition hover:bg-zinc-900/70 text-xs ${
-                isCurrent ? "bg-indigo-950/25 border-l-2 border-indigo-500" : ""
+                isCurrent ? "bg-indigo-950/25 border border-indigo-500" : ""
               }`}
             >
               {/* Left: Index / Play Button + Artwork + Title/Artist/Album */}

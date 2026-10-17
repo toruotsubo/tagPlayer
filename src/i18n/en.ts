@@ -200,7 +200,9 @@ export const en: Translations = {
       `${selected} / ${total} selected`,
     deselectButton: "Clear Selection",
     batchEditTitle: (count: number) =>
-      `Batch edit tags for ${count} track${count === 1 ? "" : "s"}`,
+      count === 1
+        ? "Edit tags for selected track"
+        : `Batch edit tags for ${count} tracks`,
     batchRangeHint: "Shift+Click to select a range of tracks",
     batchTagPlaceholder: "Enter tag name...",
     batchTagCategoryAria: "Batch tag category",
@@ -208,7 +210,7 @@ export const en: Translations = {
     batchAddTagSuggestTip: (count: number, name: string) =>
       `Add "${name}" to ${count} selected track${count === 1 ? "" : "s"}`,
     batchAttachedTagsLabel:
-      "Tags on selected tracks (click × to remove from all selected):",
+      "Tags on selected track(s) (click × to remove):",
     batchRemoveTagTip: (name: string) =>
       `Remove "${name}" from all selected tracks`,
     trackSelectionCheckboxTip:

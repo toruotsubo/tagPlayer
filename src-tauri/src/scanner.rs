@@ -351,10 +351,18 @@ fn read_track_metadata_lofty(path: &Path) -> Option<RawTrackMeta> {
         .or(fallback_artist)
         .unwrap_or_else(|| "Unknown Artist".to_string());
 
-    let composer = tag
-        .and_then(|t| t.get_string(&ItemKey::Composer))
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty());
+    let composer = tag.and_then(|t| {
+        let list: Vec<String> = t
+            .get_strings(&ItemKey::Composer)
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if !list.is_empty() {
+            Some(list.join("; "))
+        } else {
+            None
+        }
+    });
 
     let genre = tag
         .and_then(|t| t.get_string(&ItemKey::Genre))
@@ -560,11 +568,17 @@ fn read_track_metadata_windows(path: &Path) -> Option<RawTrackMeta> {
     if let Ok(composers) = music_props.Composers() {
         if let Ok(size) = composers.Size() {
             if size > 0 {
-                if let Ok(c) = composers.GetAt(0) {
-                    let c_str = c.to_string_lossy().trim().to_string();
-                    if !c_str.is_empty() {
-                        composer = Some(c_str);
+                let mut list = Vec::new();
+                for i in 0..size {
+                    if let Ok(c) = composers.GetAt(i) {
+                        let c_str = c.to_string_lossy().trim().to_string();
+                        if !c_str.is_empty() {
+                            list.push(c_str);
+                        }
                     }
+                }
+                if !list.is_empty() {
+                    composer = Some(list.join("; "));
                 }
             }
         }
@@ -754,16 +768,19 @@ pub fn compute_default_tags(
     }
 
     // ルール②: トラックアーティスト名と作曲者名が同じ場合、作曲者名のタグづけは省略。
+    // 作曲者が「;」で区切られている場合、複数の作曲者とみなしそれぞれのタグを生成。
     // ※ トラックアーティスト名が省略された場合、または指定されている場合、直前のアーティスト名と比較
     if let Some(comp) = composer {
-        let trimmed_comp = comp.trim();
-        if !trimmed_comp.is_empty() {
-            let artist_to_compare = effective_track_artist
-                .or_else(|| track_artist.map(|s| s.trim()))
-                .unwrap_or(trimmed_album_artist);
+        let artist_to_compare = effective_track_artist
+            .or_else(|| track_artist.map(|s| s.trim()))
+            .unwrap_or(trimmed_album_artist);
 
-            if !trimmed_comp.eq_ignore_ascii_case(artist_to_compare) {
-                track_tags.push(trimmed_comp.to_string());
+        for single_comp in comp.split([';', '；']) {
+            let trimmed = single_comp.trim();
+            if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case(artist_to_compare) {
+                if !track_tags.iter().any(|t| t.eq_ignore_ascii_case(trimmed)) {
+                    track_tags.push(trimmed.to_string());
+                }
             }
         }
     }
@@ -1000,9 +1017,14 @@ pub fn scan_and_save_directory(
             );
 
             for tt in track_tags {
+                let is_composer = track_meta.composer.as_deref().map_or(false, |comp| {
+                    comp.split([';', '；'])
+                        .any(|c| c.trim().eq_ignore_ascii_case(tt.as_str()))
+                });
+
                 let category = if track_meta.track_artist.as_deref() == Some(tt.as_str()) {
                     "artist"
-                } else if track_meta.composer.as_deref() == Some(tt.as_str()) {
+                } else if is_composer {
                     "composer"
                 } else {
                     "other"
@@ -1160,5 +1182,38 @@ mod tests {
             assert!(data.len() > 2000, "Should ignore dummy Folder.jpg (1305 bytes) and select large cover");
             assert_eq!(data.len(), 29335);
         }
+    }
+
+    #[test]
+    fn test_compute_default_tags_multiple_composers() {
+        let (album_tags, track_tags) = compute_default_tags(
+            "The Beatles",
+            None,
+            Some("John Lennon; Paul McCartney"),
+            Some("Rock"),
+            Some(1969),
+        );
+        assert_eq!(album_tags, vec!["Rock", "The Beatles", "1969"]);
+        assert_eq!(track_tags, vec!["John Lennon", "Paul McCartney"]);
+
+        // 全角セミコロンやスペース混じり
+        let (_, track_tags_zenkaku) = compute_default_tags(
+            "Band",
+            None,
+            Some("作曲者A ； 作曲者B ; 作曲者C"),
+            None,
+            None,
+        );
+        assert_eq!(track_tags_zenkaku, vec!["作曲者A", "作曲者B", "作曲者C"]);
+
+        // トラックアーティストと作曲者の片方が一致する場合の除外
+        let (_, track_tags_partial) = compute_default_tags(
+            "Simon & Garfunkel",
+            Some("Paul Simon"),
+            Some("Paul Simon; Arthur Garfunkel"),
+            None,
+            None,
+        );
+        assert_eq!(track_tags_partial, vec!["Paul Simon", "Arthur Garfunkel"]);
     }
 }

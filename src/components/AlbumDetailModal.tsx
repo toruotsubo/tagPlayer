@@ -84,24 +84,25 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   const [newAlbumTag, setNewAlbumTag] = useState("");
   const [newAlbumTagCategory, setNewAlbumTagCategory] = useState<TagCategory>("other");
 
-  // Track Tag Edit state
-  const [editingTrackId, setEditingTrackId] = useState<number | null>(null);
-  const [newTrackTag, setNewTrackTag] = useState("");
-  const [newTrackTagCategory, setNewTrackTagCategory] = useState<TagCategory>("other");
-
   // Load tracks when album or initialEditingTrackId changes
   useEffect(() => {
     setActiveAlbum(album);
     setCoverCacheBuster(Date.now());
-    setSelectedTrackIds(new Set());
-    setLastSelectedTrackIndex(null);
     setBatchTrackTag("");
     setIsAddingAlbumTag(false);
 
     if (!album) {
       setTracks([]);
-      setEditingTrackId(null);
+      setSelectedTrackIds(new Set());
+      setLastSelectedTrackIndex(null);
       return;
+    }
+
+    if (initialEditingTrackId) {
+      setSelectedTrackIds(new Set([initialEditingTrackId]));
+    } else {
+      setSelectedTrackIds(new Set());
+      setLastSelectedTrackIndex(null);
     }
 
     let isMounted = true;
@@ -111,15 +112,17 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
         if (!isMounted) return;
         setTracks(result);
         if (initialEditingTrackId) {
-          setEditingTrackId(initialEditingTrackId);
+          setSelectedTrackIds(new Set([initialEditingTrackId]));
+          const idx = result.findIndex((t) => t.id === initialEditingTrackId);
+          if (idx !== -1) {
+            setLastSelectedTrackIndex(idx);
+          }
           setTimeout(() => {
             const el = document.getElementById(`modal-track-${initialEditingTrackId}`);
             if (el) {
               el.scrollIntoView({ behavior: "smooth", block: "center" });
             }
           }, 120);
-        } else {
-          setEditingTrackId(null);
         }
       })
       .catch((e) => {
@@ -206,44 +209,6 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
     }
   };
 
-  const handleAddTrackTag = async (
-    trackId: number,
-    tagName: string,
-    category = newTrackTagCategory
-  ) => {
-    if (!tagName.trim()) return;
-    try {
-      const updatedTags = await invoke<string[]>("add_track_tag", {
-        trackId,
-        tagName: tagName.trim(),
-        category,
-      });
-      setTracks((prev) =>
-        prev.map((t) => (t.id === trackId ? { ...t, tags: updatedTags } : t))
-      );
-      setNewTrackTag("");
-      setEditingTrackId(null);
-      onTagsChanged?.();
-    } catch (err) {
-      console.error("Add track tag error", err);
-    }
-  };
-
-  const handleRemoveTrackTag = async (trackId: number, tagName: string) => {
-    try {
-      const updatedTags = await invoke<string[]>("remove_track_tag", {
-        trackId,
-        tagName,
-      });
-      setTracks((prev) =>
-        prev.map((t) => (t.id === trackId ? { ...t, tags: updatedTags } : t))
-      );
-      onTagsChanged?.();
-    } catch (err) {
-      console.error("Remove track tag error", err);
-    }
-  };
-
   // ソート済みトラックリスト
   const sortedTracks = useMemo(() => {
     return [...tracks].sort((a, b) => {
@@ -265,8 +230,6 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
     } else {
       setSelectedTrackIds(new Set(sortedTracks.map((t) => t.id)));
       setLastSelectedTrackIndex(0);
-      setEditingTrackId(null);
-      setNewTrackTag("");
     }
   };
 
@@ -305,10 +268,6 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
     }
 
     setSelectedTrackIds(newSelected);
-    if (newSelected.size > 0) {
-      setEditingTrackId(null);
-      setNewTrackTag("");
-    }
   };
 
   // 複数曲へのタグ一括追加
@@ -408,26 +367,6 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
       .filter((t) => t.name.toLowerCase().startsWith(query))
       .slice(0, 6);
   }, [activeAlbum, availableTags, newAlbumTag]);
-
-  // トラック個別タグサジェスト候補
-  const trackTagSuggestions = useMemo(() => {
-    if (editingTrackId === null) return [];
-    const track = tracks.find((t) => t.id === editingTrackId);
-    if (!track) return [];
-    const query = newTrackTag.trim().toLowerCase();
-    const currentTags = new Set(track.tags.map((t) => t.toLowerCase()));
-
-    const candidates = availableTags.filter(
-      (t) => !currentTags.has(t.name.toLowerCase()) && !/^\d{4}$/.test(t.name)
-    );
-
-    if (!query) {
-      return candidates.slice(0, 4);
-    }
-    return candidates
-      .filter((t) => t.name.toLowerCase().startsWith(query))
-      .slice(0, 5);
-  }, [editingTrackId, tracks, availableTags, newTrackTag]);
 
   const getTagCategory = (tagName: string): TagCategory => {
     if (
@@ -892,9 +831,11 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                     setSelectedTrackIds(new Set());
                     setLastSelectedTrackIndex(null);
                   }}
-                  className="text-[11px] text-zinc-400 hover:text-zinc-200 transition cursor-pointer"
+                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-zinc-800/80 hover:bg-red-950/50 active:scale-95 text-zinc-400 hover:text-red-400 border border-zinc-700/60 hover:border-red-500/40 text-[11px] font-medium transition cursor-pointer shadow-xs select-none"
+                  title={t.albumDetailModal.deselectButton}
                 >
-                  {t.albumDetailModal.deselectButton}
+                  <X className="h-3 w-3 shrink-0" />
+                  <span>{t.albumDetailModal.deselectButton}</span>
                 </button>
               )}
             </div>
@@ -931,7 +872,11 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                       if (e.key === "Enter") handleBatchAddTrackTag(batchTrackTag);
                       if (e.key === "Escape") setBatchTrackTag("");
                     }}
-                    placeholder={t.albumDetailModal.batchTagPlaceholder}
+                    placeholder={
+                      selectedTrackIds.size === 1
+                        ? t.albumDetailModal.trackTagPlaceholder
+                        : t.albumDetailModal.batchTagPlaceholder
+                    }
                     className="text-xs px-2.5 py-1 rounded-lg bg-zinc-900 border border-indigo-500/60 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-400 w-44"
                   />
                   <select
@@ -953,7 +898,9 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                     className="text-xs px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-white font-medium transition cursor-pointer shadow-sm flex items-center gap-1"
                   >
                     <Plus className="h-3 w-3" />
-                    {t.albumDetailModal.batchAddButton}
+                    {selectedTrackIds.size === 1
+                      ? t.albumDetailModal.addAlbumTagButton
+                      : t.albumDetailModal.batchAddButton}
                   </button>
                 </div>
 
@@ -969,7 +916,17 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                         className={`px-2 py-0.5 rounded border text-xs transition cursor-pointer hover:brightness-125 flex items-center gap-0.5 ${
                           tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
                         }`}
-                        title={t.albumDetailModal.batchAddTagSuggestTip(selectedTrackIds.size, s.name)}
+                        title={
+                          selectedTrackIds.size === 1
+                            ? t.albumDetailModal.addTagSuggestTip(
+                                s.name,
+                                t.categories[s.category] || s.category
+                              )
+                            : t.albumDetailModal.batchAddTagSuggestTip(
+                                selectedTrackIds.size,
+                                s.name
+                              )
+                        }
                       >
                         <span>+</span>
                         <span className="text-zinc-200">{s.name}</span>
@@ -996,14 +953,20 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                               className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}
                             />
                             <span className="select-text cursor-text text-zinc-200">{item.name}</span>
-                            <span className="text-xs opacity-70 font-mono select-none">
-                              ({item.count}/{selectedTrackIds.size})
-                            </span>
+                            {selectedTrackIds.size > 1 && (
+                              <span className="text-xs opacity-70 font-mono select-none">
+                                ({item.count}/{selectedTrackIds.size})
+                              </span>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleBatchRemoveTrackTag(item.name)}
                               className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer ml-0.5 select-none"
-                              title={t.albumDetailModal.batchRemoveTagTip(item.name)}
+                              title={
+                                selectedTrackIds.size === 1
+                                  ? t.albumDetailModal.removeTagTip
+                                  : t.albumDetailModal.batchRemoveTagTip(item.name)
+                              }
                             >
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -1050,9 +1013,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                             isSelected
                               ? "bg-indigo-950/40"
                               : currentPlayingTrackId === track.id
-                              ? "bg-indigo-950/25 border-l-2 border-indigo-400"
-                              : editingTrackId === track.id
-                              ? "bg-indigo-950/30 border-l-2 border-indigo-400"
+                              ? "bg-indigo-950/25 border border-indigo-500"
                               : ""
                           }`}
                           onClick={(e) => {
@@ -1118,118 +1079,21 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                             onMouseDown={(e) => e.stopPropagation()}
                           >
                             {/* Track tags list */}
-                            <div className="flex items-center gap-1.5 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap max-w-xs sm:max-w-sm">
                               {track.tags.map((tName, tagIdx) => {
                                 const category = getTagCategory(tName);
                                 return (
                                   <span
                                     key={tagIdx}
-                                    className={`inline-flex items-center gap-1.5 text-xs font-medium pl-2.5 pr-2 py-1 rounded-md border select-text cursor-text ${tagColorClasses[category]}`}
+                                    className={`inline-flex items-center gap-1.5 text-xs font-medium pl-2.5 pr-2 py-0.5 rounded-md border select-text cursor-text ${tagColorClasses[category]}`}
                                   >
                                     <span
                                       className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}
                                     />
                                     <span className="select-text cursor-text text-zinc-200">{tName}</span>
-                                    <button
-                                      onClick={() => handleRemoveTrackTag(track.id, tName)}
-                                      className="opacity-60 hover:opacity-100 hover:text-red-400 cursor-pointer select-none ml-0.5"
-                                      title={t.albumDetailModal.removeTagTip}
-                                    >
-                                      <X className="h-3.5 w-3.5" />
-                                    </button>
                                   </span>
                                 );
                               })}
-
-                              {/* Add Track Tag input / button */}
-                              {editingTrackId === track.id ? (
-                                <div className="flex flex-col items-start gap-1">
-                                  <div className="flex items-center gap-1">
-                                    <input
-                                      type="text"
-                                      value={newTrackTag}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        setNewTrackTag(val);
-                                        const matched = availableTags.find(
-                                          (item) => item.name.toLowerCase() === val.trim().toLowerCase()
-                                        );
-                                        if (matched) {
-                                          setNewTrackTagCategory(matched.category);
-                                        }
-                                      }}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter") handleAddTrackTag(track.id, newTrackTag);
-                                        if (e.key === "Escape") setEditingTrackId(null);
-                                      }}
-                                      placeholder={t.albumDetailModal.trackTagPlaceholder}
-                                      autoFocus
-                                      className="text-xs sm:text-sm px-3 py-1 rounded-full bg-zinc-950 border border-indigo-500/60 text-zinc-100 w-28 sm:w-32 focus:outline-none"
-                                    />
-                                    <select
-                                      value={newTrackTagCategory}
-                                      onChange={(e) => setNewTrackTagCategory(e.target.value as TagCategory)}
-                                      className="text-xs px-1.5 py-1 rounded bg-zinc-950 border border-zinc-700 text-zinc-300 focus:outline-none"
-                                      aria-label={t.albumDetailModal.trackTagCategoryAria}
-                                    >
-                                      {tagCategories.map((category) => (
-                                        <option key={category.value} value={category.value}>
-                                          {t.categories[category.value] || category.label}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <button
-                                      onClick={() => handleAddTrackTag(track.id, newTrackTag)}
-                                      className="text-xs sm:text-sm px-3 py-1 rounded-full bg-indigo-600 text-white hover:bg-indigo-500 cursor-pointer font-medium"
-                                    >
-                                      {t.albumDetailModal.addAlbumTagButton}
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setEditingTrackId(null);
-                                        setNewTrackTag("");
-                                      }}
-                                      className="text-zinc-500 hover:text-zinc-300 cursor-pointer p-0.5"
-                                    >
-                                      <X className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
-                                  {trackTagSuggestions.length > 0 && (
-                                    <div className="flex flex-wrap items-center gap-1 mt-0.5 text-xs text-zinc-500">
-                                      <span>{t.common.candidates}</span>
-                                      {trackTagSuggestions.map((s) => (
-                                        <button
-                                          key={s.id}
-                                          onClick={() => handleAddTrackTag(track.id, s.name, s.category)}
-                                          className={`px-1.5 py-0.5 rounded border text-xs transition cursor-pointer hover:brightness-125 flex items-center gap-0.5 ${
-                                            tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
-                                          }`}
-                                          title={t.albumDetailModal.addTagSuggestTip(
-                                            s.name,
-                                            t.categories[s.category] || s.category
-                                          )}
-                                        >
-                                          <span>+</span>
-                                          <span className="text-zinc-200">{s.name}</span>
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => {
-                                    setEditingTrackId(track.id);
-                                    setNewTrackTag("");
-                                    setNewTrackTagCategory("other");
-                                  }}
-                                  className="py-1 px-2.5 rounded-md bg-zinc-800/40 text-zinc-400 border border-zinc-700/40 group-hover:bg-indigo-600 group-hover:hover:bg-indigo-500 group-hover:text-white group-hover:border-transparent group-hover:shadow-sm active:scale-98 font-medium text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
-                                  title={t.albumDetailModal.editTrackTagTip}
-                                >
-                                  <Tag className="h-3.5 w-3.5 shrink-0" />
-                                  <span className="text-[11px] whitespace-nowrap">{t.albumDetailModal.editTrackTagButton}</span>
-                                </button>
-                              )}
                             </div>
 
                             {onQueueTrack && (
