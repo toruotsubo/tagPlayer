@@ -16,6 +16,7 @@ import {
   Image,
   RotateCcw,
   Loader2,
+  Pencil,
 } from "lucide-react";
 import { Album, TagCategory, TagItem, Track, TrackWithAlbum, categoryDotClasses } from "../types/music";
 import { invoke } from "@tauri-apps/api/core";
@@ -38,7 +39,7 @@ interface AlbumDetailModalProps {
   onPlayAlbum?: (album: Album, tracks: Track[]) => void;
   onQueueAlbum?: (album: Album, tracks: Track[]) => void;
   onDeleteAlbum?: (albumId: number) => Promise<void>;
-  onAlbumUpdated?: (album: Album) => void;
+  onAlbumUpdated?: (album: Album, toastMsg?: string) => void;
   onTagsChanged?: () => void;
   ignoreLeadingThe?: boolean;
 }
@@ -79,6 +80,10 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   const [batchTrackTag, setBatchTrackTag] = useState("");
   const [batchTrackTagCategory, setBatchTrackTagCategory] = useState<TagCategory>("other");
 
+  // Album Title Edit state
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editingTitle, setEditingTitle] = useState("");
+
   // Album Tag Edit state
   const [isAddingAlbumTag, setIsAddingAlbumTag] = useState(false);
   const [newAlbumTag, setNewAlbumTag] = useState("");
@@ -90,6 +95,8 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
     setCoverCacheBuster(Date.now());
     setBatchTrackTag("");
     setIsAddingAlbumTag(false);
+    setIsEditingTitle(false);
+    setEditingTitle(album?.title ?? "");
 
     if (!album) {
       setTracks([]);
@@ -334,17 +341,16 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   const batchTagSuggestions = useMemo(() => {
     if (selectedTrackIds.size === 0) return [];
     const query = batchTrackTag.trim().toLowerCase();
+    if (!query) return [];
+
     const allSelectedHaveTag = new Set(
       selectedTrackTagsSummary.filter((t) => t.isAll).map((t) => t.name)
     );
 
     const candidates = availableTags.filter(
-      (t) => !allSelectedHaveTag.has(t.name) && !/^\d{4}$/.test(t.name)
+      (t) => !allSelectedHaveTag.has(t.name)
     );
 
-    if (!query) {
-      return candidates.slice(0, 5);
-    }
     return candidates
       .filter((t) => t.name.toLowerCase().startsWith(query))
       .slice(0, 6);
@@ -354,15 +360,14 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   const albumTagSuggestions = useMemo(() => {
     if (!activeAlbum) return [];
     const query = newAlbumTag.trim().toLowerCase();
+    if (!query) return [];
+
     const currentTags = new Set(activeAlbum.tags.map((t) => t.toLowerCase()));
 
     const candidates = availableTags.filter(
-      (t) => !currentTags.has(t.name.toLowerCase()) && !/^\d{4}$/.test(t.name)
+      (t) => !currentTags.has(t.name.toLowerCase())
     );
 
-    if (!query) {
-      return candidates.slice(0, 5);
-    }
     return candidates
       .filter((t) => t.name.toLowerCase().startsWith(query))
       .slice(0, 6);
@@ -404,6 +409,29 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
     }
   };
 
+  const handleSaveAlbumTitle = async () => {
+    if (!activeAlbum) return;
+    const trimmed = editingTitle.trim();
+    if (!trimmed) return;
+    if (trimmed === activeAlbum.title) {
+      setIsEditingTitle(false);
+      return;
+    }
+    try {
+      const updatedAlbum = await invoke<Album>("update_album_title", {
+        albumId: activeAlbum.id,
+        title: trimmed,
+      });
+      setActiveAlbum(updatedAlbum);
+      setIsEditingTitle(false);
+      onAlbumUpdated?.(updatedAlbum);
+      onTagsChanged?.();
+    } catch (err) {
+      console.error("Failed to update album title", err);
+      alert(t.albumDetailModal.updateAlbumTitleError(err));
+    }
+  };
+
   const handleChangeCover = async () => {
     if (!activeAlbum) return;
     try {
@@ -431,7 +459,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
 
       setActiveAlbum(updatedAlbum);
       setCoverCacheBuster(Date.now());
-      onAlbumUpdated?.(updatedAlbum);
+      onAlbumUpdated?.(updatedAlbum, t.albumDetailModal.changeCoverSuccess);
       onTagsChanged?.();
     } catch (err) {
       console.error("Failed to update album cover", err);
@@ -454,7 +482,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
       });
       setActiveAlbum(updatedAlbum);
       setCoverCacheBuster(Date.now());
-      onAlbumUpdated?.(updatedAlbum);
+      onAlbumUpdated?.(updatedAlbum, t.albumDetailModal.changeCoverSuccess);
       onTagsChanged?.();
     } catch (err) {
       console.error("Failed to reset album cover", err);
@@ -468,7 +496,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-[95vw] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden select-text">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-[95vw] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden select-none">
         {/* Modal Header */}
         <div className="p-6 border-b border-zinc-800/80 flex flex-col gap-4 bg-zinc-900/90">
           {/* Top Row: Album Info & Close Button */}
@@ -523,9 +551,60 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                 )}
               </div>
               <div className="flex flex-col justify-center min-w-0 flex-1">
-                <h2 className="text-lg font-bold text-zinc-100 truncate" title={activeAlbum.title}>
-                  {activeAlbum.title}
-                </h2>
+                {isEditingTitle ? (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <input
+                      type="text"
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSaveAlbumTitle();
+                        if (e.key === "Escape") {
+                          setIsEditingTitle(false);
+                          setEditingTitle(activeAlbum.title);
+                        }
+                      }}
+                      placeholder={t.albumDetailModal.albumTitlePlaceholder}
+                      autoFocus
+                      className="text-base sm:text-lg font-bold px-2.5 py-0.5 rounded-lg bg-zinc-950 border border-indigo-500/60 text-zinc-100 focus:outline-none focus:border-indigo-400 min-w-0 flex-1 max-w-md"
+                    />
+                    <button
+                      type="button"
+                      disabled={!editingTitle.trim()}
+                      onClick={handleSaveAlbumTitle}
+                      className="text-xs px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-white font-medium transition cursor-pointer shadow-sm shrink-0"
+                    >
+                      {t.common.save}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingTitle(false);
+                        setEditingTitle(activeAlbum.title);
+                      }}
+                      className="text-xs px-3 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-300 border border-zinc-700/80 font-medium transition cursor-pointer shadow-sm shrink-0"
+                    >
+                      {t.common.cancel}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h2 className="text-lg font-bold text-zinc-100 truncate select-text" title={activeAlbum.title}>
+                      {activeAlbum.title}
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTitle(activeAlbum.title);
+                        setIsEditingTitle(true);
+                      }}
+                      className="p-1 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition cursor-pointer shrink-0"
+                      title={t.albumDetailModal.editAlbumTitleTip}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
 
                 {(() => {
                   const { artistPrimaryTag, secondRowTags } = getAlbumDisplayTags(activeAlbum, availableTags, ignoreLeadingThe);
@@ -541,7 +620,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                             const isPrimary = primarySet.has(artistPrimaryTag.toLowerCase());
                             return (
                               <span
-                                className={`group/tag inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-2.5 pr-2 py-1 rounded-full border shadow-sm select-text ${
+                                className={`group/tag inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-2.5 pr-2 py-1 rounded-full border shadow-sm ${
                                   tagColorClasses[category] || tagColorClasses.artist
                                 }`}
                                 title={artistPrimaryTag}
@@ -579,32 +658,17 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                           return (
                             <span
                               key={i}
-                              className={`group/tag inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-2.5 pr-2 py-1 rounded-full border select-text ${
+                              className={`group/tag inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-2.5 pr-2 py-1 rounded-full border ${
                                 isPrimary ? "shadow-sm font-medium" : ""
                               } ${tagColorClasses[category]}`}
                             >
-                              <button
-                                type="button"
-                                disabled={!canBePrimary}
-                                onClick={() => {
-                                  if (canBePrimary) {
-                                    handleTogglePrimaryTag(tName, isPrimary);
-                                  }
-                                }}
-                                className={`p-0.5 rounded transition ${
-                                  canBePrimary
-                                    ? "cursor-pointer hover:scale-110 active:scale-95"
-                                    : "cursor-default"
-                                }`}
-                                title={
-                                  isPrimary
-                                    ? t.albumDetailModal.unsetPrimaryTip
-                                    : canBePrimary
-                                    ? t.albumDetailModal.setPrimaryTip(t.categories[category] || category)
-                                    : undefined
-                                }
-                              >
-                                {isPrimary ? (
+                              {isPrimary ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePrimaryTag(tName, isPrimary)}
+                                  className="p-0.5 rounded cursor-pointer hover:scale-110 active:scale-95 transition"
+                                  title={t.albumDetailModal.unsetPrimaryTip}
+                                >
                                   <Star
                                     className={`h-3.5 w-3.5 fill-current shrink-0 ${
                                       category === "genre"
@@ -614,19 +678,28 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                                         : "text-emerald-400"
                                     }`}
                                   />
-                                ) : canBePrimary ? (
+                                </button>
+                              ) : canBePrimary ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePrimaryTag(tName, isPrimary)}
+                                  className="p-0.5 rounded cursor-pointer hover:scale-110 active:scale-95 transition"
+                                  title={t.albumDetailModal.setPrimaryTip(t.categories[category] || category)}
+                                >
                                   <span className="relative flex items-center justify-center group/star w-3.5 h-3.5">
                                     <span
                                       className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]} group-hover/star:opacity-0 transition-opacity`}
                                     />
                                     <Star className="h-3.5 w-3.5 text-zinc-400 hover:text-zinc-100 opacity-0 group-hover/star:opacity-100 absolute shrink-0 transition-opacity" />
                                   </span>
-                                ) : (
+                                </button>
+                              ) : (
+                                <span className="w-3.5 h-3.5 flex items-center justify-center p-0.5">
                                   <span
                                     className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}
                                   />
-                                )}
-                              </button>
+                                </span>
+                              )}
                               <span className="select-text cursor-text text-zinc-200">{tName}</span>
                               <button
                                 onClick={() => handleRemoveAlbumTag(tName)}
@@ -713,26 +786,22 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                 })()}
 
                 {/* Tag Suggestions for Album */}
-                {isAddingAlbumTag && (
+                {isAddingAlbumTag && albumTagSuggestions.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5 mt-2 text-xs text-zinc-500">
                     <span>{t.common.candidates}</span>
-                    {albumTagSuggestions.length > 0 ? (
-                      albumTagSuggestions.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => handleAddAlbumTag(s.name, s.category)}
-                          className={`px-2 py-0.5 rounded border text-xs transition cursor-pointer flex items-center gap-0.5 hover:brightness-125 ${
-                            tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
-                          }`}
-                          title={t.albumDetailModal.addTagSuggestTip(s.name, t.categories[s.category] || s.category)}
-                        >
-                          <span>+</span>
-                          <span className="text-zinc-200">{s.name}</span>
-                        </button>
-                      ))
-                    ) : newAlbumTag.trim() ? (
-                      <span className="text-zinc-500 italic">{t.albumDetailModal.noSuggestMatches}</span>
-                    ) : null}
+                    {albumTagSuggestions.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => handleAddAlbumTag(s.name, s.category)}
+                        className={`px-2 py-0.5 rounded border text-xs transition cursor-pointer flex items-center gap-0.5 hover:brightness-125 ${
+                          tagColorClasses[s.category] || "bg-zinc-800 text-zinc-300 border-zinc-700"
+                        }`}
+                        title={t.albumDetailModal.addTagSuggestTip(s.name, t.categories[s.category] || s.category)}
+                      >
+                        <span>+</span>
+                        <span className="text-zinc-200">{s.name}</span>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -947,7 +1016,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                         return (
                           <span
                             key={item.name}
-                            className={`inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-3 pr-2.5 py-1 rounded-full border select-text cursor-text ${tagColorClasses[category]}`}
+                            className={`inline-flex items-center gap-2 text-xs sm:text-sm font-medium pl-3 pr-2.5 py-1 rounded-full border ${tagColorClasses[category]}`}
                           >
                             <span
                               className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}
@@ -1023,6 +1092,9 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                               handleToggleTrackSelect(track.id, idx, e);
                               return;
                             }
+                            if (window.getSelection()?.toString()) {
+                              return;
+                            }
                             if (onPlayTrack) {
                               onPlayTrack(track, activeAlbum);
                             } else {
@@ -1051,7 +1123,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                             <div className="flex flex-col truncate">
                               <div className="flex items-center gap-2 truncate">
                                 <span
-                                  className={`font-medium transition truncate ${
+                                  className={`font-medium transition truncate select-text ${
                                     currentPlayingTrackId === track.id
                                       ? "text-indigo-400"
                                       : isSelected
@@ -1067,7 +1139,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                               </div>
                               {track.artist && (
                                 <div className="flex items-center gap-2 text-[10px] text-zinc-500 truncate">
-                                  <span>{track.artist}</span>
+                                  <span className="select-text">{track.artist}</span>
                                 </div>
                               )}
                             </div>
@@ -1085,7 +1157,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                                 return (
                                   <span
                                     key={tagIdx}
-                                    className={`inline-flex items-center gap-1.5 text-xs font-medium pl-2.5 pr-2 py-0.5 rounded-md border select-text cursor-text ${tagColorClasses[category]}`}
+                                    className={`inline-flex items-center gap-1.5 text-xs font-medium pl-2.5 pr-2 py-0.5 rounded-md border ${tagColorClasses[category]}`}
                                   >
                                     <span
                                       className={`h-2 w-2 rounded-full shrink-0 ${categoryDotClasses[category]}`}

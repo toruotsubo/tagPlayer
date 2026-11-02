@@ -112,8 +112,8 @@ function App() {
       typeof err === "string"
         ? err
         : err instanceof Error
-        ? err.message
-        : String(err ?? "");
+          ? err.message
+          : String(err ?? "");
     const isFileNotFound =
       rawErrorStr.includes("ファイルが存在しません") ||
       rawErrorStr.toLowerCase().includes("not found");
@@ -124,8 +124,8 @@ function App() {
         ? "artist" in track && track.artist
           ? track.artist
           : "album_artist" in track
-          ? track.album_artist
-          : undefined
+            ? track.album_artist
+            : undefined
         : undefined,
       albumTitle: track && "album_title" in track ? track.album_title : undefined,
       filePath: track?.file_path,
@@ -181,16 +181,8 @@ function App() {
     }
   };
 
-  // タグ選択変更時のトラック取得
-  useEffect(() => {
-    if (selectedTags.length > 0) {
-      loadTagTracks(selectedTags, matchAll);
-    } else {
-      if (viewMode === "tracks") {
-        loadTagTracks([], matchAll);
-      }
-    }
-  }, [selectedTags, matchAll]);
+  // トラック一覧の取得済み条件を追跡（条件変更時やライブラリ更新時に過不足なく再取得）
+  const lastFetchedConditionRef = useRef<string | null>(null);
 
   const loadTagTracks = async (tags: string[], isMatchAll: boolean) => {
     setLoadingTagTracks(true);
@@ -208,11 +200,28 @@ function App() {
     }
   };
 
-  const handleSwitchViewMode = (mode: "albums" | "tracks") => {
-    setViewMode(mode);
-    if (mode === "tracks" && tagTracks.length === 0) {
+  const invalidateTagTracks = () => {
+    lastFetchedConditionRef.current = null;
+    if (viewMode === "tracks") {
+      const currentKey = `${[...selectedTags].sort().join(",")}|${matchAll}`;
+      lastFetchedConditionRef.current = currentKey;
       loadTagTracks(selectedTags, matchAll);
     }
+  };
+
+  // タグ選択変更または曲タブ表示時のトラック取得
+  useEffect(() => {
+    if (viewMode === "tracks") {
+      const currentKey = `${[...selectedTags].sort().join(",")}|${matchAll}`;
+      if (lastFetchedConditionRef.current !== currentKey) {
+        lastFetchedConditionRef.current = currentKey;
+        loadTagTracks(selectedTags, matchAll);
+      }
+    }
+  }, [viewMode, selectedTags, matchAll]);
+
+  const handleSwitchViewMode = (mode: "albums" | "tracks") => {
+    setViewMode(mode);
   };
 
   // 再生位置とステータスの同期ポーリング
@@ -280,6 +289,7 @@ function App() {
           setSelectedTags([]);
           setLibrary(result);
           loadPlaylists();
+          invalidateTagTracks();
           if (result.albums.length === 0) {
             alert(t.app.noMusicFilesFound(dirPath));
           }
@@ -467,7 +477,7 @@ function App() {
     setModalTrackId(null);
   };
 
-  const handleAlbumUpdated = (updatedAlbum: Album) => {
+  const handleAlbumUpdated = (updatedAlbum: Album, toastMsg?: string) => {
     setModalAlbum(updatedAlbum);
     setLibrary((prev) => ({
       ...prev,
@@ -476,18 +486,20 @@ function App() {
     setQueue((prev) =>
       prev.map((t) =>
         t.album_id === updatedAlbum.id
-          ? { ...t, cover_url: updatedAlbum.cover_url }
+          ? { ...t, album_title: updatedAlbum.title, cover_url: updatedAlbum.cover_url }
           : t
       )
     );
     setTagTracks((prev) =>
       prev.map((t) =>
         t.album_id === updatedAlbum.id
-          ? { ...t, cover_url: updatedAlbum.cover_url }
+          ? { ...t, album_title: updatedAlbum.title, cover_url: updatedAlbum.cover_url }
           : t
       )
     );
-    showToast(t.albumDetailModal.changeCoverSuccess);
+    if (toastMsg) {
+      showToast(toastMsg);
+    }
   };
 
   // アルバムのライブラリからの削除
@@ -496,9 +508,7 @@ function App() {
     const albumTitle = targetAlbum?.title ?? t.common.albumFallback;
     await invoke("delete_album", { albumId });
     await loadLibrary();
-    if (selectedTags.length > 0 || viewMode === "tracks") {
-      loadTagTracks(selectedTags, matchAll);
-    }
+    invalidateTagTracks();
     showToast(t.toast.albumDeleted(albumTitle));
   };
 
@@ -960,11 +970,10 @@ function App() {
         <div className="flex items-center">
           <button
             onClick={() => setIsQueueOpen(!isQueueOpen)}
-            className={`flex w-[calc(18rem-1rem)] items-center justify-between rounded-lg px-3.5 py-2 text-xs font-medium text-white transition active:scale-95 cursor-pointer shadow-sm ${
-              isQueueOpen
+            className={`flex w-[calc(18rem-1rem)] items-center justify-between rounded-lg px-3.5 py-2 text-xs font-medium text-white transition active:scale-95 cursor-pointer shadow-sm ${isQueueOpen
                 ? "bg-indigo-500 ring-1 ring-indigo-300/40"
                 : "bg-indigo-600/90 hover:bg-indigo-500"
-            }`}
+              }`}
             title={t.app.queueButtonTip}
           >
             <div className="flex items-center gap-2">
@@ -1030,18 +1039,17 @@ function App() {
                 <button
                   onClick={() => handleSwitchViewMode("albums")}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${viewMode === "albums"
-                      ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
+                    ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
                     }`}
                 >
                   <Disc3 className="h-3.5 w-3.5" />
                   <span>{t.app.albumsTab}</span>
                   <span
-                    className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border text-[10px] font-mono font-medium leading-none ${
-                      viewMode === "albums"
+                    className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border text-[10px] font-mono font-medium leading-none ${viewMode === "albums"
                         ? "border-zinc-600 bg-zinc-900/80 text-zinc-200"
                         : "border-zinc-700/80 bg-zinc-950/60 text-zinc-400"
-                    }`}
+                      }`}
                   >
                     {sortedAlbums.length}
                   </span>
@@ -1050,18 +1058,17 @@ function App() {
                 <button
                   onClick={() => handleSwitchViewMode("tracks")}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${viewMode === "tracks"
-                      ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
+                    ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
                     }`}
                 >
                   <Music2 className="h-3.5 w-3.5" />
                   <span>{t.app.tracksTab}</span>
                   <span
-                    className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border text-[10px] font-mono font-medium leading-none ${
-                      viewMode === "tracks"
+                    className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border text-[10px] font-mono font-medium leading-none ${viewMode === "tracks"
                         ? "border-zinc-600 bg-zinc-900/80 text-zinc-200"
                         : "border-zinc-700/80 bg-zinc-950/60 text-zinc-400"
-                    }`}
+                      }`}
                   >
                     {sortedTagTracks.length}
                   </span>
@@ -1079,7 +1086,7 @@ function App() {
                       setAlbumSortOrder(next);
                       try {
                         localStorage.setItem("tagPlayer_albumSortOrder", next);
-                      } catch {}
+                      } catch { }
                     }}
                   />
                 </div>
@@ -1096,7 +1103,7 @@ function App() {
                       setTrackSortOrder(next);
                       try {
                         localStorage.setItem("tagPlayer_trackSortOrder", next);
-                      } catch {}
+                      } catch { }
                     }}
                   />
                 </div>
@@ -1245,9 +1252,7 @@ function App() {
         onAlbumUpdated={handleAlbumUpdated}
         onTagsChanged={() => {
           loadLibrary();
-          if (selectedTags.length > 0 || viewMode === "tracks") {
-            loadTagTracks(selectedTags, matchAll);
-          }
+          invalidateTagTracks();
         }}
         ignoreLeadingThe={ignoreLeadingThe}
       />
@@ -1379,8 +1384,8 @@ function App() {
                 repeatMode === "off"
                   ? t.player.repeatOff
                   : repeatMode === "all"
-                  ? t.player.repeatAll
-                  : t.player.repeatOne
+                    ? t.player.repeatAll
+                    : t.player.repeatOne
               }
             >
               {repeatMode === "one" ? (

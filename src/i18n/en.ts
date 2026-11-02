@@ -161,6 +161,10 @@ export const en: Translations = {
     closeButton: "Close",
   },
   albumDetailModal: {
+    editAlbumTitleTip: "Edit album title",
+    albumTitlePlaceholder: "Enter album title...",
+    updateAlbumTitleError: (err: unknown) =>
+      `Failed to update album title: ${String(err)}`,
     changeCover: "Change Cover",
     changeCoverTip: "Change album cover image",
     changeCoverSuccess: "Album cover image updated",

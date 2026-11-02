@@ -889,6 +889,18 @@ pub fn delete_album(conn: &mut Connection, album_id: i64) -> Result<()> {
     Ok(())
 }
 
+pub fn update_album_title(
+    conn: &Connection,
+    album_id: i64,
+    title: &str,
+) -> Result<Album> {
+    conn.execute(
+        "UPDATE albums SET title = ?1 WHERE id = ?2",
+        params![title.trim(), album_id],
+    )?;
+    get_album(conn, album_id)
+}
+
 pub fn update_album_cover(
     conn: &Connection,
     album_id: i64,

@@ -153,6 +153,9 @@ export interface Translations {
     closeButton: string;
   };
   albumDetailModal: {
+    editAlbumTitleTip: string;
+    albumTitlePlaceholder: string;
+    updateAlbumTitleError: (err: unknown) => string;
     changeCover: string;
     changeCoverTip: string;
     changeCoverSuccess: string;

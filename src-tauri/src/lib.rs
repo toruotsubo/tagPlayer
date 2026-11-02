@@ -310,6 +310,21 @@ async fn delete_album(
 }
 
 #[tauri::command]
+async fn update_album_title(
+    app_handle: tauri::AppHandle,
+    album_id: i64,
+    title: String,
+) -> Result<Album, String> {
+    let trimmed = title.trim();
+    if trimmed.is_empty() {
+        return Err("アルバムタイトルを入力してください".to_string());
+    }
+    let db_path = get_db_path(&app_handle)?;
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+    db::update_album_title(&conn, album_id, trimmed).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn update_album_cover(
     app_handle: tauri::AppHandle,
     album_id: i64,
@@ -457,6 +472,7 @@ pub fn run() {
             add_tracks_tag,
             remove_tracks_tag,
             delete_album,
+            update_album_title,
             update_album_cover,
             reset_album_cover,
         ])

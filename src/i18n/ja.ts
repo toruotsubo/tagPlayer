@@ -159,6 +159,10 @@ export const ja: Translations = {
     closeButton: "閉じる",
   },
   albumDetailModal: {
+    editAlbumTitleTip: "アルバムタイトルを編集",
+    albumTitlePlaceholder: "アルバムタイトルを入力...",
+    updateAlbumTitleError: (err: unknown) =>
+      `アルバムタイトルの更新に失敗しました: ${String(err)}`,
     changeCover: "画像を変更",
     changeCoverTip: "アルバムカバー画像を変更する",
     changeCoverSuccess: "カバー画像を変更しました",
