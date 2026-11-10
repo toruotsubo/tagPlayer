@@ -749,9 +749,14 @@ function App() {
   });
 
   // 既存のタグに加えて、リリース年（1950〜1959等）から10年刻みの年代タグ（1950s等）を自動生成
+  // アルバム等に直接付与された「n0s」タグが既存タグにある場合は、自動生成された「n0s」タグに統合し単独表示しない
   const allTags = useMemo(() => {
     const decadeTags = generateDecadeTags(library.albums, library.tags);
-    return [...library.tags, ...decadeTags];
+    const decadeTagNames = new Set(decadeTags.map((t) => t.name.trim().toLowerCase()));
+    const filteredLibraryTags = library.tags.filter(
+      (t) => !isDecadeTag(t.name) && !decadeTagNames.has(t.name.trim().toLowerCase())
+    );
+    return [...filteredLibraryTags, ...decadeTags];
   }, [library.albums, library.tags]);
 
   // アルバム一覧の絞り込み（タグ選択 ＆ アルバム検索: タイトルとタグ）
@@ -1045,14 +1050,11 @@ function App() {
                 >
                   <Disc3 className="h-3.5 w-3.5" />
                   <span>{t.app.albumsTab}</span>
-                  <span
-                    className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border text-[10px] font-mono font-medium leading-none ${viewMode === "albums"
-                        ? "border-zinc-600 bg-zinc-900/80 text-zinc-200"
-                        : "border-zinc-700/80 bg-zinc-950/60 text-zinc-400"
-                      }`}
-                  >
-                    {sortedAlbums.length}
-                  </span>
+                  {viewMode === "albums" && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border border-zinc-600 bg-zinc-900/80 text-zinc-200 text-[10px] font-mono font-medium leading-none">
+                      {sortedAlbums.length}
+                    </span>
+                  )}
                 </button>
 
                 <button
@@ -1064,14 +1066,11 @@ function App() {
                 >
                   <Music2 className="h-3.5 w-3.5" />
                   <span>{t.app.tracksTab}</span>
-                  <span
-                    className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border text-[10px] font-mono font-medium leading-none ${viewMode === "tracks"
-                        ? "border-zinc-600 bg-zinc-900/80 text-zinc-200"
-                        : "border-zinc-700/80 bg-zinc-950/60 text-zinc-400"
-                      }`}
-                  >
-                    {sortedTagTracks.length}
-                  </span>
+                  {viewMode === "tracks" && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full border border-zinc-600 bg-zinc-900/80 text-zinc-200 text-[10px] font-mono font-medium leading-none">
+                      {sortedTagTracks.length}
+                    </span>
+                  )}
                 </button>
               </div>
 

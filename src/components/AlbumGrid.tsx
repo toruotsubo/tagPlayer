@@ -321,8 +321,8 @@ export const AlbumGrid: React.FC<AlbumGridProps> = ({
                     className="w-full py-1.5 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-medium flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900"
                     title={t.albumGrid.editTagsTip}
                   >
-                    <Tag className="h-3.5 w-3.5" />
-                    <span>{t.common.editTags}</span>
+                    <Tag className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{t.albumGrid.editAlbumInfo}</span>
                   </button>
                 </div>
               </div>

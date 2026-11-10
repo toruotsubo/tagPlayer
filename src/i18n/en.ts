@@ -36,7 +36,7 @@ export const en: Translations = {
   app: {
     queueButton: "Queue",
     queueButtonTip: "Show playback queue",
-    registerButton: "Import",
+    registerButton: "Import Albums",
     selectMusicFolder: "Select Music Folder",
     scanning: (dir: string) => `Scanning music files in "${dir}"...`,
     noMusicFilesFound: (dir: string) =>
@@ -90,7 +90,8 @@ export const en: Translations = {
   albumGrid: {
     playAlbumTip: "Play entire album",
     queueAlbumTip: "Add entire album to queue",
-    editTagsTip: "Open tag editor",
+    editAlbumInfo: "Edit Album Info",
+    editTagsTip: "Open album info editor",
     toggleTagTip: (name: string) => `Add/remove tag "${name}" to filter`,
     noAlbumsFoundSearch: "No albums match your search",
     noAlbumsFoundTags: "No albums match the selected tags",
@@ -198,6 +199,8 @@ export const en: Translations = {
     noTracks: "No track information available",
     selectAllTip: "Select all tracks",
     deselectAllTip: "Deselect all",
+    selectDiscTip: (disc: number) => `Select all tracks in Disc ${disc}`,
+    deselectDiscTip: (disc: number) => `Deselect all tracks in Disc ${disc}`,
     selectAllButton: "Select All",
     deselectAllButton: "Deselect All",
     selectedTracksCount: (selected: number, total: number) =>

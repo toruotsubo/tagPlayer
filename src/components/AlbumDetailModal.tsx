@@ -229,6 +229,13 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
     });
   }, [tracks]);
 
+  // ディスク一覧（複数CD判定用）
+  const uniqueDiscs = useMemo(
+    () => Array.from(new Set(sortedTracks.map((t) => t.disc_number ?? 1))),
+    [sortedTracks]
+  );
+  const hasMultipleDiscs = uniqueDiscs.length > 1;
+
   // 全曲選択 / 全解除トグル
   const handleToggleSelectAll = () => {
     if (selectedTrackIds.size === sortedTracks.length && sortedTracks.length > 0) {
@@ -238,6 +245,34 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
       setSelectedTrackIds(new Set(sortedTracks.map((t) => t.id)));
       setLastSelectedTrackIndex(0);
     }
+  };
+
+  // 指定ディスクの全曲選択 / 選択解除トグル
+  const handleToggleSelectDisc = (discNumber: number) => {
+    const discTracks = sortedTracks.filter((t) => (t.disc_number ?? 1) === discNumber);
+    if (discTracks.length === 0) return;
+
+    const allDiscSelected = discTracks.every((t) => selectedTrackIds.has(t.id));
+    const newSelected = new Set(selectedTrackIds);
+
+    if (allDiscSelected) {
+      for (const t of discTracks) {
+        newSelected.delete(t.id);
+      }
+      if (newSelected.size === 0) {
+        setLastSelectedTrackIndex(null);
+      }
+    } else {
+      for (const t of discTracks) {
+        newSelected.add(t.id);
+      }
+      const firstIdx = sortedTracks.findIndex((t) => (t.disc_number ?? 1) === discNumber);
+      if (firstIdx !== -1) {
+        setLastSelectedTrackIndex(firstIdx);
+      }
+    }
+
+    setSelectedTrackIds(newSelected);
   };
 
   // トラック選択トグル（Shift+クリックで範囲選択対応）
@@ -860,12 +895,12 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
         {!loadingTracks && sortedTracks.length > 0 && (
           <div className="border-b border-zinc-800/80 bg-zinc-900/95 px-4 py-2.5 space-y-2 shrink-0 z-20 shadow-xs">
             {/* Selection Toolbar Header */}
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-zinc-950/60 border border-zinc-800/80 text-xs">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-zinc-950/60 border border-zinc-800/80 text-xs">
+              <div className="flex items-center gap-3 flex-wrap">
                 <button
                   type="button"
                   onClick={handleToggleSelectAll}
-                  className="flex items-center gap-2 text-zinc-300 hover:text-white transition cursor-pointer select-none"
+                  className="flex items-center gap-2 text-zinc-300 hover:text-white transition cursor-pointer select-none focus:outline-none"
                   title={
                     selectedTrackIds.size === sortedTracks.length
                       ? t.albumDetailModal.deselectAllTip
@@ -885,6 +920,50 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                       : t.albumDetailModal.selectAllButton}
                   </span>
                 </button>
+
+                {hasMultipleDiscs && (
+                  <div className="flex items-center gap-2 border-l border-zinc-800 pl-3 flex-wrap">
+                    {uniqueDiscs.map((discNum) => {
+                      const discTracks = sortedTracks.filter(
+                        (t) => (t.disc_number ?? 1) === discNum
+                      );
+                      const allDiscSelected =
+                        discTracks.length > 0 &&
+                        discTracks.every((t) => selectedTrackIds.has(t.id));
+                      const someDiscSelected = discTracks.some((t) =>
+                        selectedTrackIds.has(t.id)
+                      );
+                      return (
+                        <button
+                          key={discNum}
+                          type="button"
+                          onClick={() => handleToggleSelectDisc(discNum)}
+                          className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border transition cursor-pointer select-none focus:outline-none ${
+                            allDiscSelected
+                              ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/40 font-medium"
+                              : someDiscSelected
+                              ? "bg-indigo-500/10 text-indigo-300 border-indigo-500/30"
+                              : "bg-zinc-900/80 text-zinc-300 hover:text-white hover:bg-zinc-800/80 border-zinc-800"
+                          }`}
+                          title={
+                            allDiscSelected
+                              ? t.albumDetailModal.deselectDiscTip(discNum)
+                              : t.albumDetailModal.selectDiscTip(discNum)
+                          }
+                        >
+                          {allDiscSelected ? (
+                            <CheckSquare className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                          ) : someDiscSelected ? (
+                            <MinusSquare className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                          ) : (
+                            <Square className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+                          )}
+                          <span>Disc {discNum}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {selectedTrackIds.size > 0 && (
                   <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-medium">
@@ -917,8 +996,9 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                     <Tag className="h-3.5 w-3.5" />
                     <span>{t.albumDetailModal.batchEditTitle(selectedTrackIds.size)}</span>
                   </div>
-                  <span className="text-[10px] text-zinc-500 hidden sm:inline">
-                    {t.albumDetailModal.batchRangeHint}
+                  <span className="hidden sm:flex items-center gap-1.5 text-xs text-zinc-500">
+                    <span>💡</span>
+                    <span>{t.albumDetailModal.batchRangeHint}</span>
                   </span>
                 </div>
 
@@ -1056,26 +1136,50 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
             <div className="py-12 text-center text-xs text-zinc-500">{t.albumDetailModal.loadingTracks}</div>
           ) : sortedTracks.length === 0 ? (
             <div className="py-12 text-center text-xs text-zinc-500">{t.albumDetailModal.noTracks}</div>
-          ) : (() => {
-            const uniqueDiscs = Array.from(new Set(sortedTracks.map((t) => t.disc_number ?? 1)));
-            const hasMultipleDiscs = uniqueDiscs.length > 1;
+          ) : (
+            <div className="flex flex-col divide-y divide-zinc-800/40 px-4 py-2 pb-4">
+              {sortedTracks.map((track, idx) => {
+                const currentDisc = track.disc_number ?? 1;
+                const prevDisc = idx > 0 ? (sortedTracks[idx - 1].disc_number ?? 1) : null;
+                const showDiscHeader = hasMultipleDiscs && (idx === 0 || currentDisc !== prevDisc);
+                const isSelected = selectedTrackIds.has(track.id);
+                const discTracks = showDiscHeader
+                  ? sortedTracks.filter((t) => (t.disc_number ?? 1) === currentDisc)
+                  : [];
+                const allDiscSelected =
+                  discTracks.length > 0 && discTracks.every((t) => selectedTrackIds.has(t.id));
+                const someDiscSelected = discTracks.some((t) => selectedTrackIds.has(t.id));
 
-            return (
-              <div className="flex flex-col divide-y divide-zinc-800/40 px-4 py-2 pb-4">
-                  {sortedTracks.map((track, idx) => {
-                    const currentDisc = track.disc_number ?? 1;
-                    const prevDisc = idx > 0 ? (sortedTracks[idx - 1].disc_number ?? 1) : null;
-                    const showDiscHeader = hasMultipleDiscs && (idx === 0 || currentDisc !== prevDisc);
-                    const isSelected = selectedTrackIds.has(track.id);
-
-                    return (
-                      <React.Fragment key={track.id}>
-                        {showDiscHeader && (
-                          <div className="flex items-center gap-2 py-2 px-7 -mx-4 text-[11px] font-semibold text-indigo-400 bg-zinc-900/95 border-b border-zinc-800 sticky top-0 backdrop-blur-md z-10 shadow-xs">
+                return (
+                  <React.Fragment key={track.id}>
+                    {showDiscHeader && (
+                      <div className="flex items-center py-2 px-7 -mx-4 text-[11px] font-semibold text-indigo-400 bg-zinc-900/95 border-b border-zinc-800 sticky top-0 backdrop-blur-md z-10 shadow-xs">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSelectDisc(currentDisc)}
+                          className="flex items-center gap-2.5 text-indigo-400 hover:text-indigo-300 transition cursor-pointer select-none focus:outline-none group/disc"
+                          title={
+                            allDiscSelected
+                              ? t.albumDetailModal.deselectDiscTip(currentDisc)
+                              : t.albumDetailModal.selectDiscTip(currentDisc)
+                          }
+                        >
+                          <span className="p-1 -ml-1 text-zinc-500 group-hover/disc:text-zinc-200 transition shrink-0 flex items-center justify-center">
+                            {allDiscSelected ? (
+                              <CheckSquare className="h-4 w-4 text-indigo-400" />
+                            ) : someDiscSelected ? (
+                              <MinusSquare className="h-4 w-4 text-indigo-400" />
+                            ) : (
+                              <Square className="h-4 w-4 text-zinc-500 group-hover/disc:text-zinc-300" />
+                            )}
+                          </span>
+                          <span className="flex items-center gap-1.5">
                             <Disc3 className="h-3.5 w-3.5" />
                             <span>Disc {currentDisc}</span>
-                          </div>
-                        )}
+                          </span>
+                        </button>
+                      </div>
+                    )}
                         <div
                           id={`modal-track-${track.id}`}
                           className={`group py-2.5 px-3 flex items-center justify-between rounded-lg hover:bg-zinc-800/50 transition cursor-pointer text-xs ${
@@ -1107,7 +1211,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                             <button
                               type="button"
                               onClick={(e) => handleToggleTrackSelect(track.id, idx, e)}
-                              className="p-1 -ml-1 text-zinc-500 hover:text-zinc-200 transition cursor-pointer shrink-0"
+                              className="p-1 -ml-1 text-zinc-500 hover:text-zinc-200 transition cursor-pointer shrink-0 focus:outline-none"
                               title={t.albumDetailModal.trackSelectionCheckboxTip}
                             >
                               {isSelected ? (
@@ -1201,8 +1305,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                     );
                   })}
                 </div>
-            );
-          })()}
+          )}
         </div>
       </div>
     </div>

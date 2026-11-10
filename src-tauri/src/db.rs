@@ -463,14 +463,27 @@ pub fn get_tracks_by_tags(
     for name in tags {
         let trimmed = name.trim();
         if let Some((start, end)) = parse_decade_tag(trimmed) {
-            // 年代タグ: 該当する年のタグID一覧を取得
+            // 年代タグ: 該当する年のタグID一覧（および同名の年代タグ自体のID）を取得
             let mut decade_tag_ids = Vec::new();
-            if let Ok(mut stmt) = conn.prepare("SELECT id, name FROM tags WHERE category = 'release_year'") {
-                if let Ok(rows) = stmt.query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))) {
+            if let Ok(mut stmt) = conn.prepare("SELECT id, name, category FROM tags") {
+                if let Ok(rows) = stmt.query_map([], |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                }) {
                     for r in rows.flatten() {
-                        if let Ok(y) = r.1.trim().parse::<u32>() {
-                            if (start..=end).contains(&y) {
-                                decade_tag_ids.push(r.0);
+                        let tag_id = r.0;
+                        let tag_name = r.1.trim();
+                        let tag_cat = r.2.as_str();
+                        if parse_decade_tag(tag_name) == Some((start, end)) {
+                            decade_tag_ids.push(tag_id);
+                        } else if tag_cat == "release_year" {
+                            if let Ok(y) = tag_name.parse::<u32>() {
+                                if (start..=end).contains(&y) {
+                                    decade_tag_ids.push(tag_id);
+                                }
                             }
                         }
                     }

@@ -86,6 +86,7 @@ export interface Translations {
   albumGrid: {
     playAlbumTip: string;
     queueAlbumTip: string;
+    editAlbumInfo: string;
     editTagsTip: string;
     toggleTagTip: (name: string) => string;
     noAlbumsFoundSearch: string;
@@ -183,6 +184,8 @@ export interface Translations {
     noTracks: string;
     selectAllTip: string;
     deselectAllTip: string;
+    selectDiscTip: (disc: number) => string;
+    deselectDiscTip: (disc: number) => string;
     selectAllButton: string;
     deselectAllButton: string;
     selectedTracksCount: (selected: number, total: number) => string;

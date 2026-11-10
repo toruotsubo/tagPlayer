@@ -36,7 +36,7 @@ export const ja: Translations = {
   app: {
     queueButton: "再生キュー",
     queueButtonTip: "再生キューを表示",
-    registerButton: "登録",
+    registerButton: "アルバム登録",
     selectMusicFolder: "音楽フォルダを選択",
     scanning: (dir: string) => `「${dir}」内の音楽ファイルをスキャン中...`,
     noMusicFilesFound: (dir: string) =>
@@ -88,14 +88,15 @@ export const ja: Translations = {
   albumGrid: {
     playAlbumTip: "アルバム全曲を再生",
     queueAlbumTip: "アルバム全曲をキューに追加",
-    editTagsTip: "タグ編集モーダルを開く",
+    editAlbumInfo: "アルバム情報編集",
+    editTagsTip: "アルバム情報編集モーダルを開く",
     toggleTagTip: (name: string) => `タグ「${name}」を選択タグに追加/解除`,
     noAlbumsFoundSearch: "検索条件に一致するアルバムがありません",
     noAlbumsFoundTags: "選択したタグに一致するアルバムがありません",
     noAlbumsFoundEmpty: "アルバムが見つかりません",
     noAlbumsFoundSearchSub: "検索キーワードを変更するかクリアしてください。",
     noAlbumsFoundTagsSub: "タグフィルターの選択を解除するか変更してください。",
-    noAlbumsFoundEmptySub: "上部の「登録」から音楽ファイルを読み込んでください。",
+    noAlbumsFoundEmptySub: "上部の「アルバム登録」から音楽ファイルを読み込んでください。",
   },
   albumSort: {
     label: "アルバムの並び順",
@@ -111,7 +112,7 @@ export const ja: Translations = {
     noTracksFoundEmpty: "曲が見つかりません",
     noTracksFoundSearchSub: "検索キーワードを変更するかクリアしてください。",
     noTracksFoundTagsSub: "他のタグを選択するか、タグフィルターを解除してください。",
-    noTracksFoundEmptySub: "上部の「登録」から音楽ファイルを読み込んでください。",
+    noTracksFoundEmptySub: "上部の「アルバム登録」から音楽ファイルを読み込んでください。",
     titleSearchResults: "曲検索結果",
     titleTagResults: "タグ検索結果",
     titleAllTracks: "すべての曲",
@@ -196,6 +197,8 @@ export const ja: Translations = {
     noTracks: "トラック情報がありません",
     selectAllTip: "全曲を選択",
     deselectAllTip: "全選択を解除",
+    selectDiscTip: (disc: number) => `Disc ${disc} の全曲を選択`,
+    deselectDiscTip: (disc: number) => `Disc ${disc} の選択を解除`,
     selectAllButton: "すべて選択",
     deselectAllButton: "全選択解除",
     selectedTracksCount: (selected: number, total: number) =>

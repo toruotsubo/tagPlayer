@@ -72,9 +72,9 @@ export function generateDecadeTags(albums: Album[], tags: TagItem[]): TagItem[] 
     }
   }
 
-  // 2. tags テーブル内の release_year カテゴリのタグも確認（アルバム未紐付けの場合のフォールバック）
+  // 2. tags テーブル内の release_year カテゴリのタグおよび年代タグ（n0s）も確認（アルバム未紐付けの場合のフォールバック）
   for (const t of tags) {
-    if (t.category === "release_year") {
+    if (t.category === "release_year" || isDecadeTag(t.name)) {
       const parsed = parseInt(t.name.trim(), 10);
       if (!isNaN(parsed) && parsed >= 1000 && parsed <= 2999) {
         const decade = Math.floor(parsed / 10) * 10;
